@@ -13,7 +13,7 @@ This service is separate from the existing local connector. It does not call Net
 
 ## Existing-page test entry
 
-Start this API locally, then open the existing KTV page and choose **设置 → 网站账号与云端测试**. The small test panel is deliberately separate from the local KTV library and the NetEase connector. Its default API address is `http://127.0.0.1:8787` for local development.
+Start this API locally, then open **http://127.0.0.1:8787/** and choose **设置 → 网站账号与云端测试**. The API now serves the existing static KTV page from the same origin, so its secure session cookie works in an InPrivate window. Do not use `file:///.../dist/index.html` for account testing: it is a different browser site and InPrivate blocks its cross-site session cookie.
 
 Before deploying the page, set `window.KTV_WEB_API_URL` to the public HTTPS API address in the page configuration. Do not use the local default in production.
 

@@ -1,5 +1,8 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { query } from './db.mjs';
 import { hashPassword, hashToken, newOpaqueToken, verifyPassword } from './passwords.mjs';
 
@@ -9,6 +12,29 @@ const cookieName = 'ktv_session';
 const allowedOrigins = new Set((process.env.APP_ORIGIN || 'http://localhost:5173').split(',').map(value => value.trim()).filter(Boolean));
 const allowFileOrigin = process.env.ALLOW_FILE_ORIGIN === 'true';
 const secureCookie = process.env.WEB_COOKIE_SECURE !== 'false';
+const distDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+const staticFiles = new Map([
+  ['/', { name: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/index.html', { name: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/playlist.js', { name: 'playlist.js', type: 'text/javascript; charset=utf-8' }]
+]);
+
+async function serveStaticPage(req, res) {
+  if (req.method !== 'GET') return false;
+  const pathname = new URL(req.url, 'http://local').pathname;
+  const asset = staticFiles.get(pathname);
+  if (!asset) return false;
+  try {
+    const file = await readFile(path.join(distDirectory, asset.name));
+    res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'no-store' });
+    res.end(file);
+    return true;
+  } catch (error) {
+    console.error('[web-api] static page failed', { code: error?.code, message: error?.message });
+    reply(res, 500, { error: '测试页面读取失败。' });
+    return true;
+  }
+}
 
 function reply(res, status, payload, origin) {
   const headers = { 'Content-Type': 'application/json; charset=utf-8' };
@@ -85,6 +111,7 @@ async function handle(req, res) {
     return res.end();
   }
   try {
+    if (await serveStaticPage(req, res)) return;
     if (req.method === 'GET' && req.url === '/health') {
       await query('SELECT 1');
       return reply(res, 200, { status: 'ok', service: 'ktv-web-api', database: 'connected' }, origin);
