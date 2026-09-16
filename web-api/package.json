@@ -1,0 +1,16 @@
+{
+  "name": "ktv-web-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "migrate": "node --env-file-if-exists=.env migrate.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
