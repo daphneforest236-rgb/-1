@@ -85,7 +85,10 @@ async function handle(req, res) {
     return res.end();
   }
   try {
-    if (req.method === 'GET' && req.url === '/health') return reply(res, 200, { status: 'ok', service: 'ktv-web-api', database: 'not_checked' }, origin);
+    if (req.method === 'GET' && req.url === '/health') {
+      await query('SELECT 1');
+      return reply(res, 200, { status: 'ok', service: 'ktv-web-api', database: 'connected' }, origin);
+    }
 
     if (req.method === 'POST' && req.url === '/auth/register') {
       const input = await body(req);
