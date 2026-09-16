@@ -1,54 +1,371 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#111113" />
-  <title>今夜唱什么</title>
-  <meta name="description" content="给我五首，现在选一首唱。" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='17' fill='%23f4efdf'/%3E%3Cpath d='M40 10v29.5a9.5 9.5 0 1 1-5-8.35V18l17-4v23.5a9.5 9.5 0 1 1-5-8.35V10z' fill='%23111113'/%3E%3C/svg%3E" />
-  <style>
-    :root{--ink:#141417;--muted:#77767c;--line:#e7e5e1;--paper:#fbfaf8;--accent:#d9ff3f;--pink:#ff6a98;--card:#fff;--shadow:0 16px 40px rgba(26,24,22,.07)}
-    *{box-sizing:border-box} body{margin:0;background:#efeeeb;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:16px;letter-spacing:.01em}
-    button{font:inherit;color:inherit;border:0;background:none;cursor:pointer} .app{min-height:100vh;max-width:620px;margin:auto;background:var(--paper);position:relative;overflow:hidden}
-    header{height:80px;padding:20px 21px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
-    .brand{display:flex;align-items:center;gap:10px}.mark{background:var(--ink);color:var(--accent);height:37px;width:37px;border-radius:12px;display:grid;place-items:center;font-size:19px;font-weight:900;transform:rotate(-5deg)} .brand small{display:block;font-size:11px;color:var(--muted);letter-spacing:.12em;margin-bottom:3px}.brand strong{font-size:17px;letter-spacing:.04em}
-    .top-actions{display:flex;gap:8px}.icon-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:17px}.icon-btn:hover{background:#f0efeb}
-    main{padding:22px 21px 110px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;background:#ecebe7;border-radius:14px;padding:4px;margin-bottom:19px}.tab{height:39px;border-radius:10px;color:#747379;font-weight:650;font-size:15px}.tab.active{background:#fff;color:var(--ink);box-shadow:0 2px 7px rgba(0,0,0,.07)}
-    .context{display:flex;justify-content:space-between;align-items:flex-start;margin:4px 2px 18px}.context h1{font-size:24px;margin:0 0 5px;letter-spacing:-.04em}.context p{margin:0;color:var(--muted);font-size:13px}.session{font-size:12px;color:#77736b;padding-top:6px}.session i{display:inline-block;width:6px;height:6px;border-radius:99px;background:#a5cb1b;margin-right:5px}
-    .song-list{display:flex;flex-direction:column;gap:11px}.song{background:var(--card);border:1px solid var(--line);border-radius:18px;min-height:111px;padding:13px 12px 11px;display:grid;grid-template-columns:62px minmax(0,1fr) 38px;gap:12px;box-shadow:0 3px 10px rgba(17,17,17,.025);animation:rise .32s ease both}.song:nth-child(2){animation-delay:.04s}.song:nth-child(3){animation-delay:.08s}.song:nth-child(4){animation-delay:.12s}.song:nth-child(5){animation-delay:.16s}@keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
-    .cover{width:62px;height:62px;border-radius:12px;display:grid;place-items:center;color:#fff;font-size:14px;font-weight:800;letter-spacing:.08em;position:relative;overflow:hidden}.cover:after{content:"";position:absolute;width:55px;height:55px;border:1px solid rgba(255,255,255,.45);border-radius:50%;top:-25px;right:-19px}.c1{background:linear-gradient(135deg,#1f2937,#7b2637)}.c2{background:linear-gradient(135deg,#e86c5b,#583d75)}.c3{background:linear-gradient(135deg,#a6bc51,#235f63)}.c4{background:linear-gradient(135deg,#e3ae36,#c54c3e)}.c5{background:linear-gradient(135deg,#4f65a5,#24254b)}.c6{background:linear-gradient(135deg,#cf516b,#f3ba54)}
-    .song-name{font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25;margin:1px 0 5px}.artist{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.controls{display:flex;align-items:center;gap:4px;margin-top:13px}.weight{font-size:12px;color:#8b898e;border-radius:6px;padding:5px 6px;white-space:nowrap}.weight.active{color:var(--ink);background:var(--accent);font-weight:750}.more{font-size:18px;line-height:1;margin-left:1px;padding:2px 5px;color:#69676c}.check{width:33px;height:33px;border:2px solid #b6b4b1;border-radius:10px;margin-top:12px;display:grid;place-items:center;font-size:19px;color:transparent;transition:.15s}.check:hover{border-color:var(--ink)}
-    .refresh-wrap{display:grid;place-items:center;padding:26px 0 8px}.refresh{width:55px;height:55px;border-radius:50%;background:var(--ink);color:var(--accent);display:grid;place-items:center;font-size:25px;box-shadow:0 9px 20px rgba(20,20,23,.18);transition:.16s}.refresh:hover{transform:rotate(35deg) scale(1.04)}.refresh small{display:block;color:var(--muted);font-size:12px;margin-top:9px}.empty{text-align:center;padding:66px 20px;color:var(--muted)}.empty b{display:block;color:var(--ink);font-size:18px;margin-bottom:8px}
-    .toast{position:fixed;left:50%;bottom:25px;transform:translate(-50%,100px);background:#1e1e21;color:#fff;padding:12px 16px;border-radius:12px;font-size:14px;box-shadow:var(--shadow);transition:.25s;z-index:20;white-space:nowrap}.toast.show{transform:translate(-50%,0)}
-    .shade{position:fixed;inset:0;background:rgba(19,18,20,.36);display:none;z-index:30}.shade.open{display:block}.modal{position:fixed;z-index:31;left:50%;bottom:0;transform:translate(-50%,105%);width:min(620px,100%);background:#fff;border-radius:24px 24px 0 0;padding:22px 21px calc(25px + env(safe-area-inset-bottom));transition:.28s}.modal.open{transform:translate(-50%,0)}.handle{width:35px;height:4px;background:#d7d5d1;border-radius:5px;margin:0 auto 20px}.modal h2{font-size:20px;margin:0 0 8px}.modal p{color:#6d6b70;margin:0 0 22px;font-size:14px;line-height:1.6}.modal .actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.modal button{padding:14px;border-radius:12px;font-weight:750}.cancel{background:#f0efec}.danger{background:#ffdfdf;color:#9b2828}.settings-row{display:flex;justify-content:space-between;padding:17px 0;border-top:1px solid var(--line);font-size:15px}.settings-row span{color:var(--muted)}.update{display:block;width:100%;padding:14px;border-radius:12px;background:var(--accent);font-weight:750;margin:5px 0 19px}
-    @media(min-width:700px){body{padding:26px 0}.app{min-height:calc(100vh - 52px);border-radius:28px;box-shadow:var(--shadow)}header{border-radius:28px 28px 0 0}.song{min-height:117px}}
-  </style>
-</head>
-<body>
-<div class="app">
-  <header><div class="brand"><div class="mark">♪</div><div><small>PERSONAL KTV</small><strong>今夜唱什么</strong></div></div><div class="top-actions"><button class="icon-btn" aria-label="结束本次 KTV" onclick="confirmEnd()">⌁</button><button class="icon-btn" aria-label="设置" onclick="openSettings()">⚙</button></div></header>
-  <main><nav class="tabs" aria-label="歌曲语言"><button class="tab active" data-lang="中文">中文</button><button class="tab" data-lang="日文">日文</button><button class="tab" data-lang="英文">英文</button></nav><div class="context"><div><h1 id="title">中文，唱哪首？</h1><p id="sub">给你 5 首，都是不同歌手</p></div><div class="session"><i></i>本次 KTV</div></div><section class="song-list" id="songs" aria-live="polite"></section><div class="refresh-wrap" id="refreshWrap"><button class="refresh" aria-label="换一批" onclick="refreshSongs()">↻</button><small>换一批</small></div></main>
-</div>
-<div class="toast" id="toast"></div><div class="shade" id="shade" onclick="closeModal()"></div><section class="modal" id="modal" role="dialog" aria-modal="true"></section>
-<script>
-const library={
- 中文:[['后来','刘若英','后 来','c1'],['红豆','王菲','红 豆','c2'],['晴天','周杰伦','晴 天','c3'],['可惜没如果','林俊杰','可 惜','c4'],['十年','陈奕迅','十 年','c5'],['小幸运','田馥甄','幸 运','c6'],['说好不哭','周杰伦','不 哭','c1'],['我怀念的','孙燕姿','怀 念','c2'],['修炼爱情','林俊杰','修 炼','c3'],['你的答案','阿冗','答 案','c4'],['慢冷','梁静茹','慢 冷','c5']],
- 日文:[['Lemon','米津玄師','LE MON','c1'],['奏','スキマスイッチ','奏','c2'],['Pretender','Official髭男dism','PRE','c3'],['アイドル','YOASOBI','IDOL','c4'],['夜に駆ける','YOASOBI','夜 駆','c5'],['カタオモイ','Aimer','KATA','c6'],['マリーゴールド','あいみょん','MARI','c1'],['First Love','宇多田ヒカル','FIRST','c2'],['ドライフラワー','優里','DRY','c3']],
- 英文:[['Love Story','Taylor Swift','LOVE','c1'],['Someone Like You','Adele','SOME','c2'],['Yellow','Coldplay','YELL','c3'],['Just The Way You Are','Bruno Mars','JUST','c4'],['Perfect','Ed Sheeran','PERF','c5'],['Shallow','Lady Gaga','SHAL','c6'],['Counting Stars','OneRepublic','STAR','c1'],['Stay With Me','Sam Smith','STAY','c2']]
-};
-const state=JSON.parse(localStorage.getItem('ktv-prototype')||'{"lang":"中文","shown":{},"current":{},"pref":{},"sung":0,"history":3}');state.shown??={};state.current??={};state.pref??={};
-let pendingSong=null; const $=s=>document.querySelector(s); const key=s=>state.lang+'|'+s[0];
-function save(){localStorage.setItem('ktv-prototype',JSON.stringify(state))}function candidates(){let used=new Set(state.shown[state.lang]||[]);return library[state.lang].filter(s=>!used.has(s[0]))}function pick(){let pool=candidates(), artists=new Set(),out=[];pool.sort((a,b)=>(state.pref[key(b)]==='多推荐')-(state.pref[key(a)]==='多推荐')+Math.random()-.5);for(const s of pool){if(!artists.has(s[1])&&out.length<5){out.push(s);artists.add(s[1])}}return out}
-function init(){if(!state.current[state.lang]?.length){state.current[state.lang]=pick();state.shown[state.lang]=[...(state.shown[state.lang]||[]),...state.current[state.lang].map(x=>x[0])];save()}render()}
-function render(){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.lang===state.lang));$('#title').textContent=state.lang+'，唱哪首？';let list=state.current[state.lang]||[],root=$('#songs');$('#sub').textContent=list.length?`给你 ${list.length} 首，都是不同歌手`:'本次 KTV 这类歌都看过了';root.innerHTML=list.length?list.map((s,i)=>`<article class="song"><div class="cover ${s[3]}">${s[2]}</div><div><div class="song-name">${s[0]}</div><div class="artist">${s[1]}</div><div class="controls">${['少推荐','正常','多推荐'].map(p=>`<button class="weight ${pref(s)===p?'active':''}" onclick="setPref(${i},'${p}')">${p}</button>`).join('')}<button class="more" aria-label="${s[0]} 更多操作" onclick="blacklist(${i})">⋯</button></div></div><button class="check" aria-label="唱了 ${s[0]}" onclick="sung(${i})">✓</button></article>`).join(''):`<div class="empty"><b>这一类歌，今晚都看过了</b>换个语言，或结束本次 KTV 再来。</div>`;$('#refreshWrap').style.display=list.length?'grid':'none'}
-function pref(s){return state.pref[key(s)]||'正常'}function setPref(i,p){let s=state.current[state.lang][i];state.pref[key(s)]=p;save();render();toast(p==='多推荐'?'之后会更常推荐这首':'已更新推荐偏好')}
-function sung(i){let s=state.current[state.lang][i];state.current[state.lang].splice(i,1);state.sung++;save();render();toast('已记为唱了 · 本次共 '+state.sung+' 首')}
-function refreshSongs(){state.current[state.lang]=pick();state.shown[state.lang]=[...(state.shown[state.lang]||[]),...state.current[state.lang].map(x=>x[0])];save();render();toast('换了一批')}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{state.lang=b.dataset.lang;save();init()});
-function toast(t){let x=$('#toast');x.textContent=t;x.classList.add('show');clearTimeout(window.t);window.t=setTimeout(()=>x.classList.remove('show'),1800)}function modal(html){$('#modal').innerHTML=html;$('#shade').classList.add('open');$('#modal').classList.add('open')}function closeModal(){$('#shade').classList.remove('open');$('#modal').classList.remove('open')}
-function blacklist(i){pendingSong=state.current[state.lang][i];modal(`<div class="handle"></div><h2>加入黑名单？</h2><p>“${pendingSong[0]}”以后不会再出现在推荐中。</p><div class="actions"><button class="cancel" onclick="closeModal()">取消</button><button class="danger" onclick="doBlacklist()">加入黑名单</button></div>`)}function doBlacklist(){state.current[state.lang]=state.current[state.lang].filter(s=>s!==pendingSong);state.shown[state.lang]=(state.shown[state.lang]||[]).filter(n=>n!==pendingSong[0]);state.shown[state.lang].push(pendingSong[0]);save();closeModal();render();toast('已加入黑名单')}
-function confirmEnd(){modal(`<div class="handle"></div><h2>结束本次 KTV？</h2><p>会记录本次唱了 ${state.sung} 首，并清空今晚已出现的歌曲。</p><div class="actions"><button class="cancel" onclick="closeModal()">继续唱</button><button class="danger" onclick="endSession()">结束本次</button></div>`)}function endSession(){state.history++;state.shown={};state.current={};state.sung=0;save();closeModal();init();toast('本次 KTV 已结束')}
-function openSettings(){modal(`<div class="handle"></div><h2>设置</h2><p>你的歌曲和偏好只保存在这台设备。</p><button class="update" onclick="closeModal();toast('网易云数据已更新（演示）')">更新网易云数据</button><div class="settings-row">黑名单 <span>0 首</span></div><div class="settings-row">KTV 历史 <span>${state.history} 次</span></div><div class="settings-row">清除本地数据 <span>›</span></div>`)}init();
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111114"><title>今夜唱什么</title><style>:root{--bg:#111114;--line:#302f34;--ink:#f6f2ed;--mut:#99969b;--red:#ef4051;--soft:#3e2227}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:radial-gradient(circle at 90% -10%,#351720,transparent 33rem),var(--bg);font:16px "PingFang SC","Microsoft YaHei",sans-serif}button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}.app{min-height:100vh;max-width:680px;margin:auto;padding:20px 21px 115px}.top{height:68px;display:flex;align-items:center;justify-content:space-between}.brand small{display:block;color:var(--red);font-size:10px;font-weight:800;letter-spacing:.18em;margin-bottom:6px}.brand h1{font:800 29px "STKaiti","KaiTi",serif;letter-spacing:.06em;margin:0}.head{display:flex;gap:7px;align-items:center}.end{color:#bbb6ba;border:1px solid #3a393e;padding:8px 11px;border-radius:99px;font-size:13px}.gear{width:42px;height:42px;border-radius:50%;font-size:19px;color:#c2bec1}.langs{display:flex;gap:26px;margin:18px 0 24px}.lang{position:relative;padding:7px 0;color:#908d92;font-weight:700;font-size:17px}.lang.active{color:#fff}.lang.active:after{content:"";position:absolute;bottom:-5px;left:50%;width:6px;height:6px;background:var(--red);border-radius:50%;transform:translateX(-50%)}.song{display:grid;grid-template-columns:66px minmax(0,1fr) 50px;gap:14px;min-height:122px;padding:16px 0;border-bottom:1px solid var(--line)}.cover{height:66px;width:66px;border-radius:8px;display:grid;place-items:center;overflow:hidden;position:relative;color:#fff;font-size:10px;font-weight:900;letter-spacing:.07em;text-align:center;box-shadow:inset 0 0 0 1px #fff2}.cover:after{content:"";position:absolute;border:1px solid #fff6;width:72px;height:72px;border-radius:50%;top:-41px;right:-28px}.a{background:linear-gradient(140deg,#be3541,#17284e)}.b{background:linear-gradient(140deg,#f09d3c,#722448)}.c{background:linear-gradient(140deg,#77954e,#175261)}.d{background:linear-gradient(140deg,#5e3c78,#e36362)}.e{background:linear-gradient(140deg,#285d89,#d6b74e)}.f{background:linear-gradient(140deg,#8c2a53,#d5774f)}.details{min-width:0;padding-top:2px}.name{font-weight:800;font-size:18px;line-height:1.25;max-height:2.5em;overflow:hidden}.artist{font-size:14px;color:var(--mut);margin-top:4px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.actions{display:flex;align-items:center;margin-top:13px;gap:2px}.pref{font-size:12px;color:#938f94;padding:5px 6px;border-radius:6px}.pref.active{background:var(--soft);color:#ff9ca6}.more{font-size:20px;color:#969297;width:28px}.done{align-self:center;width:46px;height:46px;border:2px solid #89858a;border-radius:13px;color:transparent;font-size:26px;display:grid;place-items:center}.done:hover{border-color:var(--red)}.refresh-zone{display:grid;place-items:center;padding:30px 0 5px}.refresh{width:82px;height:54px;border-radius:30px;background:#f4efe8;color:#171619;font-size:27px;box-shadow:0 10px 28px #0007}.refresh-zone small{font-size:12px;color:var(--mut);letter-spacing:.12em;margin-top:11px}.empty{text-align:center;padding:69px 12px 50px;color:var(--mut);line-height:1.7}.empty strong{display:block;color:#fff;font:800 23px "STKaiti","KaiTi",serif;margin-bottom:7px}.toast{position:fixed;z-index:9;left:50%;bottom:24px;transform:translate(-50%,110px);background:#f1ece5;color:#171619;border-radius:99px;padding:11px 16px;font-size:14px;box-shadow:0 7px 25px #0008;transition:.22s;white-space:nowrap}.toast.show{transform:translate(-50%,0)}.veil{display:none;position:fixed;inset:0;background:#000a;z-index:10}.veil.open{display:block}.sheet{position:fixed;z-index:11;bottom:0;left:50%;width:min(680px,100%);max-height:87vh;overflow:auto;transform:translate(-50%,105%);transition:.25s;background:#202025;border:1px solid #3b393e;border-bottom:0;border-radius:23px 23px 0 0;padding:15px 21px 25px}.sheet.open{transform:translate(-50%,0)}.handle{width:34px;height:4px;border-radius:4px;background:#757177;margin:0 auto 20px}.sheet h2{font:800 25px "STKaiti","KaiTi",serif;margin:0 0 8px}.sheet p{font-size:14px;color:#aaa6ab;line-height:1.65;margin:0 0 20px}.row,.option{width:100%;text-align:left;display:flex;justify-content:space-between;padding:17px 1px;border-top:1px solid var(--line);font-size:16px}.option{display:block}.option small{display:block;color:#969297;font-size:13px;margin-top:5px}.row span{color:#969297;font-size:14px}.primary,.secondary{width:100%;padding:15px;border-radius:13px;font-weight:800;margin:3px 0 15px}.primary{background:#f4efe8;color:#171619}.secondary{border:1px solid #5b585d}.twos{display:grid;grid-template-columns:1fr 1fr;gap:9px}.twos button{padding:14px;border-radius:13px;font-weight:800}.cancel{background:#39383d}.confirm{background:#f2ebe4;color:#1b191a}.danger{color:#ff9ca6}.list-item{display:flex;justify-content:space-between;padding:14px 0;border-top:1px solid var(--line)}.list-item span{color:#989499;font-size:14px}.note{padding:14px;margin-bottom:15px;border-radius:12px;background:#2a292e;color:#b2aeb3;font-size:13px;line-height:1.65}.hide{display:none!important}@media(min-width:720px){body{padding:25px 0}.app{min-height:calc(100vh - 50px);padding-left:30px;padding-right:30px;border-radius:28px;background:linear-gradient(150deg,#19191c,#111114);box-shadow:0 22px 65px #0008}}</style></head><body><div class="app"><header class="top"><div class="brand"><small>PERSONAL KTV</small><h1>今夜唱什么</h1></div><div class="head"><button class="end" onclick="endAsk()">结束</button><button class="gear" onclick="settings()">⚙</button></div></header><nav class="langs"><button class="lang active" data-lang="中文">中文</button><button class="lang" data-lang="日文">日文</button><button class="lang" data-lang="英文">英文</button></nav><main><section id="songs"></section><div class="refresh-zone" id="refreshZone"><button class="refresh" onclick="refreshBatch()">↻</button><small>换一批</small></div></main></div><div id="toast" class="toast"></div><div id="veil" class="veil" onclick="closeSheet()"></div><section id="sheet" class="sheet"></section><script src="playlist.js"></script><script>
+const SCHEMA='ktv-legacy-v1',langs=['中文','日文','英文'],es=()=>({lang:'中文',shown:{中文:[],日文:[],英文:[]},current:{中文:[],日文:[],英文:[]},sung:0}),ns=()=>({library:[],session:es(),history:[],schema:SCHEMA});let state;try{state=JSON.parse(localStorage.getItem('ktv-v1'))||ns()}catch{state=ns()}const incoming=window.KTV_IMPORTED?.tracks||[];if(!state.library?.length){let old=new Map((state.library||[]).map(s=>[s.title+'|'+s.artist,s]));state.library=incoming.map(s=>({...s,pref:old.get(s.title+'|'+s.artist)?.pref||'正常',black:old.get(s.title+'|'+s.artist)?.black||false,manual:old.get(s.title+'|'+s.artist)?.manual||false}));let sung=state.session?.sung||0;state.session=es();state.session.sung=sung;state.schema=SCHEMA;localStorage.setItem('ktv-v1',JSON.stringify(state))}state.session??=es();state.history??=[];for(const l of langs){state.session.shown[l]??=[];state.session.current[l]??=[]}const $=x=>document.querySelector(x),L=()=>state.session.lang,save=()=>localStorage.setItem('ktv-v1',JSON.stringify(state)),get=id=>state.library.find(s=>s.id===id),h=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function score(s){return(s.pref==='多推荐'?500:s.pref==='少推荐'?-500:0)+Math.random()*100}function pick(){let used=new Set(state.session.shown[L()]),artists=new Set(),out=[];state.library.filter(s=>s.lang===L()&&!s.black&&!used.has(s.id)).sort((a,b)=>score(b)-score(a)).forEach(s=>{let names=s.artist.split(/[、/&+]/).map(x=>x.trim());if(!names.some(x=>artists.has(x))&&out.length<5){out.push(s.id);names.forEach(x=>artists.add(x))}});return out}function ensure(){if(!state.session.current[L()].length){let p=pick();state.session.current[L()]=p;state.session.shown[L()]=[...new Set([...state.session.shown[L()],...p])];save()}render()}function render(){document.querySelectorAll('.lang').forEach(b=>b.classList.toggle('active',b.dataset.lang===L()));let a=state.session.current[L()].map(get).filter(Boolean);$('#songs').innerHTML=a.length?a.map(s=>`<article class="song"><div class="cover ${s.cover}">${h(s.title.slice(0,6))}</div><div class="details"><div class="name">${h(s.title)}</div><div class="artist">${h(s.artist)}</div><div class="actions">${['少推荐','正常','多推荐'].map(p=>`<button class="pref ${s.pref===p?'active':''}" onclick="pref('${s.id}','${p}')">${p}</button>`).join('')}<button class="more" onclick="more('${s.id}')">⋯</button></div></div><button class="done" onclick="sung('${s.id}')">✓</button></article>`).join(''):`<div class="empty"><strong>这一类歌，今晚都看过了</strong>换个语言，或结束本次 KTV 再来。</div>`;$('#refreshZone').classList.toggle('hide',!a.length)}function toast(t){let e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(window.timer);window.timer=setTimeout(()=>e.classList.remove('show'),1800)}function pref(id,p){get(id).pref=p;save();render();toast(p==='多推荐'?'已多推荐，之后更常出现':p==='少推荐'?'已少推荐，之后大幅减少':'已恢复正常推荐')}function sung(id){state.session.current[L()]=state.session.current[L()].filter(x=>x!==id);state.session.sung++;save();render();toast('已记为唱了')}function refreshBatch(){let p=pick();state.session.current[L()]=p;state.session.shown[L()]=[...new Set([...state.session.shown[L()],...p])];save();render();toast('换了一批')}document.querySelectorAll('.lang').forEach(b=>b.onclick=()=>{state.session.lang=b.dataset.lang;save();ensure()});function sheet(x){$('#sheet').innerHTML=x;$('#veil').classList.add('open');$('#sheet').classList.add('open')}function closeSheet(){$('#veil').classList.remove('open');$('#sheet').classList.remove('open')}function more(id){let s=get(id);sheet(`<div class="handle"></div><h2>${h(s.title)}</h2>${langs.map(l=>`<button class="option" onclick="move('${id}','${l}')">移动到${l}</button>`).join('')}<button class="option danger" onclick="blackAsk('${id}')">加入黑名单<small>以后不再参与推荐</small></button>`)}function move(id,l){let s=get(id);if(s.lang!==l){state.session.current[s.lang]=state.session.current[s.lang].filter(x=>x!==id);s.lang=l;s.manual=true;save();render();toast('已移动到'+l)}closeSheet()}function blackAsk(id){let s=get(id);sheet(`<div class="handle"></div><h2>加入黑名单？</h2><p>“${h(s.title)}”以后不会再出现在推荐中。</p><div class="twos"><button class="cancel" onclick="more('${id}')">取消</button><button class="confirm" onclick="black('${id}')">加入黑名单</button></div>`)}function black(id){let s=get(id);s.black=true;state.session.current[s.lang]=state.session.current[s.lang].filter(x=>x!==id);save();closeSheet();render();toast('已加入黑名单')}function endAsk(){sheet(`<div class="handle"></div><h2>结束本次 KTV？</h2><p>会记录本次唱了 ${state.session.sung} 首，并清空今晚已出现的歌曲。</p><div class="twos"><button class="cancel" onclick="closeSheet()">继续唱</button><button class="confirm" onclick="endSession()">结束本次</button></div>`)}function endSession(){state.history.unshift({date:new Date().toLocaleDateString('zh-CN'),count:state.session.sung});state.session=es();save();closeSheet();ensure();toast('本次 KTV 已结束')}function settings(){sheet(`<div class="handle"></div><h2>设置</h2><button class="primary" onclick="importView()">更新网易云数据</button><button class="row" onclick="blackView()">黑名单 <span>${state.library.filter(s=>s.black).length} 首　›</span></button><button class="row" onclick="historyView()">KTV 历史 <span>${state.history.length} 次　›</span></button><button class="row danger" onclick="clearOne()">清除所有数据 <span>›</span></button>`)}function importView(){let c=l=>state.library.filter(s=>s.lang===l&&!s.black).length;sheet(`<div class="handle"></div><h2>网易云数据已更新</h2><div class="note">已从「${window.KTV_IMPORTED?.name||'KTV必唱歌曲'}」导入 ${state.library.length} 首歌曲。没有播放次数或歌词数据，因此未虚构近期排行、历史排行或自动可唱性结论。</div><p>新增歌曲　${state.library.length}<br>合并重复版本　1<br><br>中文　${c('中文')} · 日文　${c('日文')} · 英文　${c('英文')}</p><button class="secondary" onclick="closeSheet()">知道了</button>`)}function blackView(){let a=state.library.filter(s=>s.black);sheet(`<div class="handle"></div><h2>黑名单</h2><p>${a.length?'以下歌曲不会被推荐。':'还没有手动加入黑名单的歌曲。'}</p>${a.map(s=>`<div class="list-item">${h(s.title)}<span>${h(s.artist)}</span></div>`).join('')}`)}function historyView(){sheet(`<div class="handle"></div><h2>KTV 历史</h2><p>${state.history.length?'只记录日期与当次唱歌数量。':'还没有已结束的 KTV。'}</p>${state.history.map(x=>`<div class="list-item">${x.date}<span>${x.count} 首</span></div>`).join('')}`)}function clearOne(){sheet(`<div class="handle"></div><h2>清除所有数据？</h2><p>将删除本地歌曲曲库、推荐偏好、黑名单、人工语言分类、KTV 历史和当前 KTV 会话。</p><div class="twos"><button class="cancel" onclick="settings()">取消</button><button class="confirm" onclick="clearTwo()">继续</button></div>`)}function clearTwo(){sheet(`<div class="handle"></div><h2>确认无法撤销</h2><p>所有本地 KTV 数据将被永久清除。</p><div class="twos"><button class="cancel" onclick="settings()">返回</button><button class="confirm" onclick="clearAll()">确认清除</button></div>`)}function clearAll(){localStorage.removeItem('ktv-v1');state=ns();state.library=incoming;closeSheet();ensure();toast('已清除所有本地数据')}ensure();
 </script>
-</body></html>
+<script>
+(() => {
+  const baseLanguages = ['中文', '日文', '英文'];
+  const commonLanguages = ['韩文', '粤语', '法语', '西班牙语', '德语', '俄语', '泰语'];
+  state.languages ??= [...baseLanguages, ...(state.customLangs ?? [])];
+  delete state.customLangs;
+  document.head.insertAdjacentHTML('beforeend', '<style>.langs{align-items:center;flex-wrap:wrap}.add-lang{width:29px;height:29px;border:1px solid #4a474c;border-radius:50%;color:#c4c0c4;font-size:21px;line-height:1}.add-lang:hover{border-color:#ef4051;color:#fff}.language-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #302f34;padding:13px 1px;font-size:16px}.language-row button{min-width:52px;padding:7px 10px;border:1px solid #57535a;border-radius:99px;font-size:13px}.language-row button.danger{border-color:#73414a}.language-row button:disabled{color:#77737a;border-color:#3e3c42}</style>');
+  const allLanguages = () => state.languages;
+  const nav = document.querySelector('.langs');
+  function selectLanguage(language) {
+    state.session.lang = language;
+    state.session.shown[language] ??= [];
+    state.session.current[language] ??= [];
+    save(); ensureCustom();
+  }
+  function syncLanguageTabs() {
+    nav.innerHTML = '';
+    state.languages.forEach(language => {
+      const button = document.createElement('button');
+      button.className = 'lang'; button.dataset.lang = language; button.textContent = language;
+      button.onclick = () => selectLanguage(language); nav.append(button);
+    });
+    const add = document.createElement('button');
+    add.className = 'add-lang'; add.type = 'button'; add.setAttribute('aria-label', '语言管理'); add.textContent = '+';
+    add.onclick = openLanguageManager; nav.append(add);
+  }
+  function ensureCustom() {
+    const language = L(); state.session.shown[language] ??= []; state.session.current[language] ??= [];
+    if (!state.session.current[language].length) { const choices = pick(); state.session.current[language] = choices; state.session.shown[language] = [...new Set([...state.session.shown[language], ...choices])]; save(); }
+    render();
+  }
+  function openLanguageManager() {
+    const managedLanguages = [...new Set([...baseLanguages, ...commonLanguages])];
+    sheet(`<div class="handle"></div><h2>语言管理</h2><p>移除后，该语言下的歌曲会转入保留列表中的第一种语言。</p>${managedLanguages.map(language => { const added = state.languages.includes(language); const action = added ? (state.languages.length > 1 ? `<button class="danger" onclick="removeLanguage('${language}')">移除</button>` : '<button disabled>保留</button>') : `<button onclick="chooseCustomLanguage('${language}')">添加</button>`; return `<div class="language-row"><span>${language}</span>${action}</div>`; }).join('')}`);
+  }
+  window.chooseCustomLanguage = language => {
+    if (!state.languages.includes(language)) state.languages.push(language);
+    state.session.shown[language] ??= []; state.session.current[language] ??= [];
+    save(); syncLanguageTabs(); openLanguageManager(); toast(`已添加${language}`);
+  };
+  window.removeLanguage = language => {
+    if (state.languages.length <= 1) return;
+    const fallback = state.languages.find(item => item !== language);
+    state.library.forEach(song => { if (song.lang === language) song.lang = fallback; });
+    state.languages = state.languages.filter(item => item !== language);
+    delete state.session.shown[language]; delete state.session.current[language];
+    if (L() === language) state.session.lang = fallback;
+    state.session.shown[fallback] ??= []; state.session.current[fallback] ??= [];
+    save(); syncLanguageTabs(); ensureCustom(); openLanguageManager(); toast(`已移除${language}`);
+  };
+  window.more = id => { const song = get(id); sheet(`<div class="handle"></div><h2>${h(song.title)}</h2>${allLanguages().map(language => `<button class="option" onclick="move('${id}','${language}')">移动到${language}</button>`).join('')}<button class="option danger" onclick="blackAsk('${id}')">加入黑名单<small>以后不再参与推荐</small></button>`); };
+  window.move = (id, language) => {
+    const song = get(id); state.session.current[song.lang] ??= []; state.session.current[song.lang] = state.session.current[song.lang].filter(songId => songId !== id);
+    state.session.shown[language] ??= []; state.session.current[language] ??= []; song.lang = language; song.manual = true;
+    save(); closeSheet(); render(); toast(`已移动到${language}`);
+  };
+  state.session.shown[L()] ??= []; state.session.current[L()] ??= [];
+  syncLanguageTabs(); ensureCustom();
+})();
+</script>
+<script>
+(() => {
+  const sync = state.sync ??= {
+    auto: true,
+    periodHours: 12,
+    connector: '未连接',
+    lastSync: null,
+    sources: [],
+    batches: [{ id: 'manual-import-1', time: new Date().toLocaleDateString('zh-CN'), added: state.library.length, updated: 0, held: 0, failed: 0, automatic: false }],
+    pending: [],
+    inProgress: false
+  };
+  sync.inProgress ??= false;
+  save();
+  document.head.insertAdjacentHTML('beforeend', '<style>.sync-meta{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #302f34;font-size:14px}.sync-meta span{color:#99969b;text-align:right}.sync-section{margin:20px 0 7px;font-size:13px;color:#99969b}.sync-status{display:inline-flex;align-items:center;gap:7px;color:#aaa6ab;font-size:13px}.sync-status:before{content:"";width:7px;height:7px;border-radius:50%;background:#e7923d}.sync-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.sync-actions button{padding:13px;border-radius:13px;border:1px solid #57535a;font-weight:700}.sync-actions .sync-primary{background:#f4efe8;color:#171619;border:0}.sync-actions button:disabled{opacity:.45}.source-remove{color:#ff9ca6}.pending-empty{padding:17px 0;color:#99969b;font-size:14px}</style>');
+  function syncSummary() {
+    const latest = sync.batches[0];
+    return latest ? `新增 ${latest.added} · 更新 ${latest.updated} · 暂缓 ${latest.held} · 失败 ${latest.failed}` : '暂无同步记录';
+  }
+  window.settings = () => {
+    sheet(`<div class="handle"></div><h2>设置</h2><button class="primary" onclick="openDataSync()">数据同步</button><button class="row" onclick="blackView()">黑名单 <span>${state.library.filter(song => song.black).length} 首　›</span></button><button class="row" onclick="historyView()">KTV 历史 <span>${state.history.length} 次　›</span></button><button class="row danger" onclick="clearOne()">清除所有数据 <span>›</span></button>`);
+  };
+  window.openDataSync = () => {
+    const last = sync.lastSync || '尚未完成自动同步';
+    sheet(`<div class="handle"></div><h2>数据同步</h2><div class="sync-status">本机数据连接器：${sync.connector}</div><div class="sync-meta">上次同步 <span>${last}</span></div><div class="sync-meta">自动同步 <span>${sync.auto ? `每 ${sync.periodHours} 小时检查` : '已暂停'}</span></div><div class="sync-section">数据来源</div>${sync.sources.length ? sync.sources.map(source => `<div class="sync-meta">${h(source.name)}<span>${source.type} · ${source.count} 首<br><button class="source-remove" onclick="askRemoveSource('${source.id}')">移除数据来源</button></span></div>`).join('') : '<div class="pending-empty">尚未选择同步来源。</div>'}<div class="sync-section">最近一次导入</div><div class="sync-meta">${syncSummary()}<span>${sync.batches[0]?.automatic ? '自动同步' : '手动导入'}</span></div><div class="sync-section">待确认歌曲</div>${sync.pending.length ? `<button class="secondary" onclick="openPendingSongs()">${sync.pending.length} 首待确认　›</button>` : '<div class="pending-empty">没有需要确认的歌曲。</div>'}<div class="sync-actions"><button class="sync-primary" onclick="syncNow()">立即同步</button><button onclick="toggleAutoSync()">${sync.auto ? '暂停自动同步' : '恢复自动同步'}</button><button onclick="connectorHelp()">重新扫码</button><button ${sync.inProgress ? '' : 'disabled'} onclick="cancelCurrentSync()">取消本次同步</button><button ${sync.batches[0]?.automatic ? '' : 'disabled'} onclick="undoLatestImport()">撤销本次导入</button></div>`);
+  };
+  window.syncNow = () => {
+    if (sync.connector !== '已连接') { toast('未检测到本机数据连接器'); return; }
+    toast('正在校验本机数据源');
+  };
+  window.cancelCurrentSync = () => { sync.inProgress = false; save(); openDataSync(); toast('已取消本次同步'); };
+  window.toggleAutoSync = () => { sync.auto = !sync.auto; save(); openDataSync(); toast(sync.auto ? '已恢复自动同步' : '已暂停自动同步'); };
+  window.connectorHelp = () => sheet(`<div class="handle"></div><h2>连接网易云</h2><p>需要先安装并运行本机数据连接器，再使用网易云 App 扫码授权。授权信息只保留在你的电脑上，不会上传到外部服务器。</p><button class="secondary" onclick="openDataSync()">返回数据同步</button>`);
+  window.askRemoveSource = id => sheet(`<div class="handle"></div><h2>移除数据来源？</h2><p>将停止从该来源自动同步。已导入到本地的歌曲、偏好、黑名单和 KTV 历史不会被删除。</p><div class="twos"><button class="cancel" onclick="openDataSync()">取消</button><button class="confirm" onclick="removeSource('${id}')">移除来源</button></div>`);
+  window.removeSource = id => { sync.sources = sync.sources.filter(source => source.id !== id); save(); openDataSync(); toast('已移除数据来源'); };
+  window.openPendingSongs = () => sheet(`<div class="handle"></div><h2>待确认歌曲</h2><p>只有语言或人声类型无法可靠判断的歌曲会出现在这里；待确认歌曲不会进入推荐池。</p><div class="pending-empty">当前没有待确认歌曲。</div><button class="secondary" onclick="openDataSync()">返回数据同步</button>`);
+  window.undoLatestImport = () => { toast('当前没有可撤销的自动导入批次'); };
+})();
+</script>
+<script>
+(() => {
+  const CONNECTOR = 'http://127.0.0.1:16368';
+  let qrTimer = null;
+  const sync = state.sync ??= {};
+  // v2 deliberately separates songs already in this browser from a scan that
+  // happens now.  Do not turn an old batch into a fresh-result badge.
+  if (sync.liveVersion !== 2) {
+    sync.historySongCount = state.library.length;
+    sync.lastLiveScan = null;
+    sync.batches = [];
+    sync.sources = [];
+    sync.lastError = null;
+    sync.liveVersion = 2;
+    save();
+  }
+  const safe = value => h(String(value ?? ''));
+  const cnTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '尚未完成自动同步';
+  const connectorFetch = async (path, options = {}) => {
+    let response;
+    try {
+      response = await fetch(CONNECTOR + path, {
+        method: options.method || 'GET',
+        headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+    } catch {
+      throw new Error('连接器未启动。请先运行 npm run connector。');
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.error) throw new Error(payload.error || '本机数据连接器返回异常。');
+    return payload;
+  };
+  const statusText = status => {
+    if (!status) return '未连接';
+    if (status.connected) return '已授权';
+    return status.connector === 'ready' ? '等待扫码授权' : '未连接';
+  };
+  const syncSummary = () => {
+    const latest = sync.batches?.[0];
+    return latest ? `扫描 ${latest.scanned ?? '-'} · 新增 ${latest.added || 0} · 更新 ${latest.updated || 0} · 已存在 ${latest.existing || 0} · 待确认 ${latest.held || 0}` : '暂无同步记录';
+  };
+  const lastSyncMs = status => status?.lastSyncAt ? new Date(status.lastSyncAt).getTime() : 0;
+  const shouldAutoSync = status => {
+    if (!status?.connected || !status.autoSync || status.syncing || !status.sources?.length) return false;
+    const elapsed = Date.now() - lastSyncMs(status);
+    return !lastSyncMs(status) || elapsed >= (status.syncPeriodHours || 12) * 60 * 60 * 1000;
+  };
+  const coverFor = index => ['a', 'b', 'c', 'd', 'e', 'f'][index % 6];
+  const songFromConnector = (item, index) => ({
+    id: item.id,
+    title: item.title,
+    artist: item.artist,
+    lang: item.language?.value || '中文',
+    cover: coverFor(state.library.length + index),
+    recent: 0,
+    total: 0,
+    pref: '正常',
+    black: false,
+    manual: false,
+    source: 'connector',
+    neteaseSongId: item.neteaseSongId,
+    sources: item.sourceIds || []
+  });
+  const applyStatus = status => {
+    sync.connector = statusText(status);
+    sync.lastSync = status?.lastSyncAt ? cnTime(status.lastSyncAt) : sync.lastSync || null;
+    sync.auto = status?.autoSync ?? sync.auto ?? true;
+    sync.periodHours = status?.syncPeriodHours ?? sync.periodHours ?? 12;
+    sync.sources = (status?.sources || []).map(source => ({ ...source, type: '网易云歌单', count: source.count || '待同步' }));
+    sync.inProgress = Boolean(status?.syncing);
+    sync.pendingCount = status?.pendingCount || 0;
+    sync.queueCount = status?.queueCount || 0;
+    sync.recordCount = status?.recordCount || 0;
+    sync.lastError = status?.lastError || null;
+    save();
+    return status;
+  };
+  const checkConnector = async () => {
+    try { return applyStatus(await connectorFetch('/health')); }
+    catch (error) {
+      sync.connector = '未连接';
+      sync.lastError = error.message;
+      save();
+      return null;
+    }
+  };
+  const queueItems = async () => {
+    const queue = await connectorFetch('/queue');
+    sync.pending = (queue.items || []).filter(item => item.status === 'pending');
+    save();
+    return queue.items || [];
+  };
+  const mergeReadySongs = items => {
+    let added = 0, updated = 0, held = 0;
+    const existing = new Map(state.library.map(song => [song.id, song]));
+    items.forEach((item, index) => {
+      if (item.status !== 'ready') { if (item.status === 'pending') held++; return; }
+      const current = existing.get(item.id);
+      if (current) {
+        current.title = item.title || current.title;
+        current.artist = item.artist || current.artist;
+        current.album = item.album || current.album;
+        current.sources = [...new Set([...(current.sources || []), ...(item.sourceIds || [])])];
+        if (!current.manual && item.language?.value) current.lang = item.language.value;
+        updated++;
+      } else {
+        state.library.push(songFromConnector(item, index));
+        added++;
+      }
+    });
+    state.languages ??= ['中文', '日文', '英文'];
+    state.library.forEach(song => {
+      if (!state.languages.includes(song.lang)) state.languages.push(song.lang);
+      state.session.shown[song.lang] ??= [];
+      state.session.current[song.lang] ??= [];
+    });
+    return { added, updated, held };
+  };
+  const applyMetadataUpdates = updates => {
+    const existing = new Map(state.library.map(song => [song.id, song]));
+    (updates || []).forEach(update => {
+      const song = existing.get(update.id);
+      if (!song) return;
+      song.title = update.title || song.title;
+      song.artist = update.artist || song.artist;
+      song.album = update.album || song.album;
+      song.durationMs = update.durationMs || song.durationMs;
+      song.sources = [...new Set([...(song.sources || []), ...(update.sourceIds || [])])];
+      if (!song.manual && update.language?.value) song.lang = update.language.value;
+    });
+  };
+  const sourcePanel = () => sync.sources?.length
+    ? sync.sources.map(source => `<div class="sync-meta">${safe(source.name)}<span>${safe(source.type)} · ${safe(source.count)}<br><button class="source-remove" onclick="askRemoveSource('${safe(source.id)}')">移除数据来源</button></span></div>`).join('')
+    : `<div class="pending-empty">尚未选择同步来源。输入一个网易云歌单 ID 后才可以扫描。</div>`;
+  document.head.insertAdjacentHTML('beforeend', '<style>.toast{z-index:30}.sync-status.ready:before{background:#49b36d}.sync-status.offline:before{background:#b94c5d}.qr-box{display:grid;place-items:center;margin:18px 0;padding:18px;border:1px solid #3d3a41;border-radius:13px;background:#17171b}.qr-box img{width:min(245px,80vw);height:auto;border-radius:8px;background:#fff}.qr-tip{font-size:13px;color:#aaa6ab;line-height:1.7}.pending-song{padding:13px 0;border-top:1px solid #302f34}.pending-song strong{display:block;font-size:15px}.pending-song span{display:block;margin-top:4px;color:#99969b;font-size:13px;line-height:1.55}.pending-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:11px}.pending-actions button{padding:9px 6px;border:1px solid #57535a;border-radius:10px;font-size:13px}</style>');
+  window.openDataSync = async () => {
+    const status = await checkConnector();
+    const statusClass = status?.connected ? 'ready' : (status ? '' : 'offline');
+    const live = sync.lastLiveScan;
+    const result = live ? `本次实时扫描：${live.scanned} 首 · 新增 ${live.added} · 更新 ${live.updated} · 待确认 ${live.held}<span>${safe(live.time)}</span>` : '本次实时扫描：尚未进行';
+    sheet(`<div class="handle"></div><h2>数据同步</h2><div class="sync-status ${statusClass}">本机数据连接器：${safe(sync.connector)}</div>${sync.lastError ? `<div class="note">本次操作失败：${safe(sync.lastError)}</div>` : ''}<div class="note">历史歌曲：当前页面保留 ${sync.historySongCount ?? state.library.length} 首旧数据；它们不是本次实时扫描结果。</div><div class="sync-section">网易云歌单来源</div>${sourcePanel()}<button class="secondary" onclick="addPlaylistSource()">输入网易云歌单 ID</button><div class="sync-section">实时扫描结果</div><div class="sync-meta">${result}</div><div class="sync-section">待确认歌曲</div>${(sync.pending?.length || sync.pendingCount) ? `<button class="secondary" onclick="openPendingSongs()">${sync.pending?.length || sync.pendingCount} 首待确认　›</button>` : '<div class="pending-empty">没有需要确认的歌曲。</div>'}<div class="sync-actions"><button class="sync-primary" onclick="syncNow()">扫描已选歌单</button><button onclick="connectorHelp()">网易云登录</button><button onclick="toggleAutoSync()">${sync.auto ? '暂停自动同步' : '恢复自动同步'}</button><button ${sync.queueCount ? '' : 'disabled'} onclick="cancelCurrentSync()">取消本次同步</button></div>`);
+  };
+  window.addPlaylistSource = async () => {
+    const playlistId = window.prompt('请输入网易云歌单 ID（纯数字）：');
+    if (playlistId === null) return;
+    try {
+      await connectorFetch('/sources', { method: 'POST', body: { playlistId } });
+      await checkConnector();
+      openDataSync();
+      toast('已添加歌单来源');
+    } catch (error) { toast(error.message); }
+  };
+  window.connectorHelp = async () => {
+    clearInterval(qrTimer);
+    sheet('<div class="handle"></div><h2>连接网易云</h2><p>正在创建本地授权二维码。</p><div class="qr-box">加载中</div><button class="secondary" onclick="openDataSync()">返回数据同步</button>');
+    try {
+      const qr = await connectorFetch('/auth/qr', { method: 'POST' });
+      sheet(`<div class="handle"></div><h2>连接网易云</h2><p>用网易云音乐 App 扫码授权。授权信息只保存在这台电脑的连接器目录中。</p><div class="qr-box"><img src="${safe(qr.qrimg)}" alt="网易云扫码授权二维码"></div><div class="qr-tip" id="qrTip">等待扫码。</div><button class="secondary" onclick="openDataSync()">返回数据同步</button>`);
+      qrTimer = setInterval(async () => {
+        try {
+          const auth = await connectorFetch('/auth/status');
+          const tip = document.querySelector('#qrTip');
+          if (tip) tip.textContent = auth.status === 'scanned_waiting_confirmation' ? '已扫码，请在手机上确认登录。' : auth.status === 'authorized' ? '授权完成。' : auth.status === 'expired' ? '二维码已过期，请重新扫码。' : '等待扫码。';
+          if (auth.status === 'authorized') {
+            clearInterval(qrTimer);
+            await checkConnector();
+            toast('网易云授权完成');
+            openDataSync();
+          }
+          if (auth.status === 'expired') clearInterval(qrTimer);
+        } catch (error) {
+          clearInterval(qrTimer);
+          toast(error.message);
+        }
+      }, 2500);
+    } catch (error) { sheet(`<div class="handle"></div><h2>连接网易云</h2><div class="note">${safe(error.message)}</div><button class="secondary" onclick="openDataSync()">返回数据同步</button>`); }
+  };
+  const runSync = async ({ quiet = false } = {}) => {
+    try {
+      const status = await checkConnector();
+      if (!status) { if (!quiet) toast('未检测到本机数据连接器'); return; }
+      if (!status.connected) { if (!quiet) connectorHelp(); return; }
+      if (!status.sources.length) throw new Error('请先输入网易云歌单 ID。');
+      sync.inProgress = true; save(); if (!quiet) { openDataSync(); toast('正在同步网易云歌单'); }
+      const staged = await connectorFetch('/sync', { method: 'POST', body: { localSongIds: state.library.map(song => song.id) } });
+      applyMetadataUpdates(staged.updates);
+      const result = mergeReadySongs(staged.songs || []);
+      const items = await queueItems();
+      const commit = await connectorFetch('/queue/commit', { method: 'POST' });
+      sync.inProgress = false;
+      sync.lastSync = new Date().toLocaleString('zh-CN', { hour12: false });
+      sync.queueCount = commit.pending || 0;
+      sync.pending = items.filter(item => item.status === 'pending');
+      sync.lastLiveScan = { time: sync.lastSync, scanned: staged.scanned || 0, added: result.added, updated: staged.updated || result.updated, held: staged.pending ?? result.held };
+      save();
+      ensure();
+      if (!quiet) { closeSheet(); openDataSync(); toast(result.held ? `同步完成，${result.held} 首待确认` : '同步完成'); }
+      else if (result.added || result.updated || result.held) toast(result.held ? `自动同步完成，${result.held} 首待确认` : '自动同步完成');
+    } catch (error) {
+      sync.inProgress = false;
+      sync.lastError = error.message;
+      save();
+      if (!quiet) { openDataSync(); toast(error.message); }
+    }
+  };
+  window.syncNow = () => runSync();
+  window.cancelCurrentSync = async () => {
+    try {
+      await connectorFetch('/queue/cancel', { method: 'POST' });
+      sync.queueCount = 0; sync.pending = []; sync.inProgress = false; save();
+      openDataSync(); toast('已取消本次同步');
+    } catch (error) { toast(error.message); }
+  };
+  window.removeSource = async id => {
+    try {
+      await connectorFetch('/sources/' + encodeURIComponent(id), { method: 'DELETE' });
+      await checkConnector();
+      openDataSync();
+      toast('已移除数据来源');
+    } catch (error) { toast(error.message); }
+  };
+  const pendingActions = item => ['中文', '日文', '英文', '纯音乐', '伴奏', '忽略'].map(action => `<button onclick="confirmPendingSong('${safe(item.id)}','${action}')">${action}</button>`).join('');
+  window.confirmPendingSong = async (id, action) => {
+    try {
+      await connectorFetch('/queue/items/' + encodeURIComponent(id), { method: 'POST', body: { action } });
+      let added = 0, updated = 0;
+      if (!['纯音乐', '伴奏', '忽略'].includes(action)) {
+        const items = await queueItems();
+        const result = mergeReadySongs(items);
+        added = result.added; updated = result.updated;
+      }
+      const commit = await connectorFetch('/queue/commit', { method: 'POST' });
+      const items = await queueItems();
+      sync.queueCount = commit.pending || items.length;
+      sync.pending = items.filter(item => item.status === 'pending');
+      if (added || updated) {
+        sync.batches ??= [];
+        sync.batches.unshift({ id: `confirm-${Date.now()}`, time: new Date().toLocaleString('zh-CN', { hour12: false }), added, updated, held: sync.pending.length, failed: 0, automatic: true });
+      }
+      save();
+      ensure();
+      openPendingSongs();
+      toast(['纯音乐', '伴奏', '忽略'].includes(action) ? '已从推荐池排除' : '已确认并入库');
+    } catch (error) { toast(error.message); }
+  };
+  window.openPendingSongs = async () => {
+    try {
+      const items = await queueItems();
+      const pending = items.filter(item => item.status === 'pending');
+      sheet(`<div class="handle"></div><h2>待确认歌曲</h2><p>这些歌曲因为语言或人声判断置信度不足，暂不进入推荐池。</p>${pending.length ? pending.slice(0, 40).map(item => `<div class="pending-song"><strong>${safe(item.title)}</strong><span>${safe(item.artist)}<br>${safe(item.language?.reason)}；${safe(item.vocal?.reason)}</span><div class="pending-actions">${pendingActions(item)}</div></div>`).join('') : '<div class="pending-empty">当前没有待确认歌曲。</div>'}<button class="secondary" onclick="openDataSync()">返回数据同步</button>`);
+    } catch (error) { toast(error.message); }
+  };
+  window.toggleAutoSync = async () => {
+    const next = !sync.auto;
+    sync.auto = next; save();
+    try {
+      await connectorFetch('/settings', { method: 'POST', body: { autoSync: next, syncPeriodHours: sync.periodHours || 12 } });
+      await checkConnector();
+      openDataSync();
+      toast(sync.auto ? '已恢复自动同步' : '已暂停自动同步');
+    } catch (error) {
+      sync.auto = !next; save(); openDataSync(); toast(error.message);
+    }
+  };
+  window.undoLatestImport = () => toast('撤销接口下一步再接');
+  setTimeout(checkConnector, 1200);
+})();
+</script></body></html>

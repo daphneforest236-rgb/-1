@@ -1,0 +1,23 @@
+# Local authentication and connector runtime state
+connector/.state/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies, logs, and temporary files
+node_modules/
+*.log
+*.tmp
+*.cache
+
+# Local diagnostics and exported bundles
+codex-doctor-*.txt
+site.tar.gz
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+{
+  "name": "ktv-local-connector",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "connector": "node server.mjs",
+    "api": "npx @neteaseapireborn/api"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
