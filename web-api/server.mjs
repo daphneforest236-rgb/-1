@@ -16,7 +16,8 @@ const distDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 const staticFiles = new Map([
   ['/', { name: 'index.html', type: 'text/html; charset=utf-8' }],
   ['/index.html', { name: 'index.html', type: 'text/html; charset=utf-8' }],
-  ['/playlist.js', { name: 'playlist.js', type: 'text/javascript; charset=utf-8' }]
+  ['/playlist.js', { name: 'playlist.js', type: 'text/javascript; charset=utf-8' }],
+  ['/cloud-library.js', { name: 'cloud-library.js', type: 'text/javascript; charset=utf-8' }]
 ]);
 
 async function serveStaticPage(req, res) {
@@ -66,12 +67,12 @@ function cookies(req) {
   }));
 }
 
-async function body(req) {
+async function body(req, limit = 16 * 1024) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 16 * 1024) throw new Error('请求内容过大。');
+    if (size > limit) throw new Error('请求内容过大。');
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
@@ -81,6 +82,58 @@ async function body(req) {
 
 function validEmail(email) { return /^\S+@\S+\.\S+$/.test(String(email)); }
 function validPassword(password) { return typeof password === 'string' && password.length >= 10 && password.length <= 200; }
+const trackColumns = 'id, source_song_id, title, artist, lang, cover, recent, total, pref, black, manual, source, created_at, updated_at';
+const trackInsertColumns = 'id, source_song_id, title, artist, lang, cover, recent, total, pref, black, manual, source, user_id';
+const allowedPref = new Set(['少推荐', '正常', '多推荐']);
+const allowedCover = new Set(['a', 'b', 'c', 'd', 'e', 'f']);
+
+function nonNegativeInt(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : 0;
+}
+
+function normalizeTrack(input, { requireTitle = true } = {}) {
+  const title = String(input?.title || '').trim();
+  const artist = String(input?.artist || '').trim();
+  if (requireTitle && (!title || !artist)) throw new Error('歌曲必须填写歌名和歌手。');
+  if (title.length > 200 || artist.length > 200) throw new Error('歌名和歌手不能超过 200 个字符。');
+  const lang = String(input?.lang || '中文').trim().slice(0, 40) || '中文';
+  const sourceSongId = String(input?.sourceSongId || input?.id || `manual-${crypto.randomUUID()}`).trim();
+  if (!sourceSongId || sourceSongId.length > 220) throw new Error('歌曲来源标识无效。');
+  const cover = allowedCover.has(input?.cover) ? input.cover : 'a';
+  return {
+    sourceSongId,
+    title,
+    artist,
+    lang,
+    cover,
+    recent: nonNegativeInt(input?.recent),
+    total: nonNegativeInt(input?.total),
+    pref: allowedPref.has(input?.pref) ? input.pref : '正常',
+    black: Boolean(input?.black),
+    manual: Boolean(input?.manual),
+    source: String(input?.source || 'manual').trim().slice(0, 60) || 'manual'
+  };
+}
+
+function trackPayload(row) {
+  return {
+    id: row.id,
+    sourceSongId: row.source_song_id,
+    title: row.title,
+    artist: row.artist,
+    lang: row.lang,
+    cover: row.cover,
+    recent: row.recent,
+    total: row.total,
+    pref: row.pref,
+    black: row.black,
+    manual: row.manual,
+    source: row.source,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
 
 async function currentUser(req) {
   const token = cookies(req)[cookieName];
@@ -107,7 +160,7 @@ async function handle(req, res) {
   const origin = req.headers.origin;
   if (req.method === 'OPTIONS') {
     if (!origin || !(allowedOrigins.has(origin) || (allowFileOrigin && origin === 'null'))) return reply(res, 403, { error: '不允许的网页来源。' }, origin);
-    res.writeHead(204, { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin' });
     return res.end();
   }
   try {
@@ -165,6 +218,70 @@ async function handle(req, res) {
       if (!value || value.length > 200) throw new Error('测试数据必须为 1 到 200 个字符。');
       const result = await query('INSERT INTO user_test_items (id, user_id, value) VALUES ($1, $2, $3) RETURNING id, value, created_at', [crypto.randomUUID(), user.id, value]);
       return reply(res, 201, { item: result.rows[0] }, origin);
+    }
+
+    if (req.method === 'GET' && req.url === '/library/tracks') {
+      const result = await query(`SELECT ${trackColumns} FROM user_library_tracks WHERE user_id = $1 ORDER BY created_at ASC`, [user.id]);
+      return reply(res, 200, { tracks: result.rows.map(trackPayload) }, origin);
+    }
+
+    if (req.method === 'POST' && req.url === '/library/tracks') {
+      const track = normalizeTrack(await body(req));
+      const result = await query(
+        `INSERT INTO user_library_tracks (${trackInsertColumns})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING ${trackColumns}`,
+        [crypto.randomUUID(), track.sourceSongId, track.title, track.artist, track.lang, track.cover, track.recent, track.total, track.pref, track.black, track.manual, track.source, user.id]
+      );
+      return reply(res, 201, { track: trackPayload(result.rows[0]) }, origin);
+    }
+
+    if (req.method === 'POST' && req.url === '/library/import') {
+      const input = await body(req, 128 * 1024);
+      if (!Array.isArray(input.tracks) || input.tracks.length === 0) throw new Error('没有可导入的本机歌曲。');
+      if (input.tracks.length > 500) throw new Error('一次最多导入 500 首歌曲。');
+      let added = 0;
+      for (const item of input.tracks) {
+        const track = normalizeTrack(item);
+        const result = await query(
+          `INSERT INTO user_library_tracks (${trackInsertColumns})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (user_id, source_song_id) DO NOTHING
+           RETURNING id`,
+          [crypto.randomUUID(), track.sourceSongId, track.title, track.artist, track.lang, track.cover, track.recent, track.total, track.pref, track.black, track.manual, track.source, user.id]
+        );
+        added += result.rowCount;
+      }
+      return reply(res, 200, { added, skipped: input.tracks.length - added });
+    }
+
+    const trackMatch = req.url.match(/^\/library\/tracks\/([0-9a-f-]{36})$/i);
+    if (trackMatch && req.method === 'PATCH') {
+      const input = await body(req);
+      const updates = [];
+      const values = [];
+      const permitted = {
+        lang: value => String(value || '').trim().slice(0, 40) || '中文',
+        pref: value => { if (!allowedPref.has(value)) throw new Error('推荐等级无效。'); return value; },
+        black: value => Boolean(value),
+        manual: value => Boolean(value),
+        title: value => { const text = String(value || '').trim(); if (!text || text.length > 200) throw new Error('歌名无效。'); return text; },
+        artist: value => { const text = String(value || '').trim(); if (!text || text.length > 200) throw new Error('歌手无效。'); return text; }
+      };
+      for (const [key, validate] of Object.entries(permitted)) {
+        if (Object.hasOwn(input, key)) { values.push(validate(input[key])); updates.push(`${key} = $${values.length}`); }
+      }
+      if (!updates.length) throw new Error('没有可修改的歌曲属性。');
+      values.push(trackMatch[1], user.id);
+      const result = await query(`UPDATE user_library_tracks SET ${updates.join(', ')}, updated_at = now() WHERE id = $${values.length - 1} AND user_id = $${values.length} RETURNING ${trackColumns}`, values);
+      if (!result.rowCount) return reply(res, 404, { error: '歌曲不存在或不属于当前账号。' }, origin);
+      return reply(res, 200, { track: trackPayload(result.rows[0]) }, origin);
+    }
+
+    if (trackMatch && req.method === 'DELETE') {
+      const result = await query('DELETE FROM user_library_tracks WHERE id = $1 AND user_id = $2 RETURNING id', [trackMatch[1], user.id]);
+      if (!result.rowCount) return reply(res, 404, { error: '歌曲不存在或不属于当前账号。' }, origin);
+      return reply(res, 200, { ok: true, id: result.rows[0].id }, origin);
     }
 
     return reply(res, 404, { error: '接口不存在。' }, origin);

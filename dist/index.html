@@ -103,6 +103,7 @@ const SCHEMA='ktv-legacy-v1',langs=['中文','日文','英文'],es=()=>({lang:'�
 <script>
 (() => {
   const CONNECTOR = 'http://127.0.0.1:16368';
+  const IS_LOCAL_PAGE = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   let qrTimer = null;
   const sync = state.sync ??= {};
   // v2 deliberately separates songs already in this browser from a scan that
@@ -119,6 +120,7 @@ const SCHEMA='ktv-legacy-v1',langs=['中文','日文','英文'],es=()=>({lang:'�
   const safe = value => h(String(value ?? ''));
   const cnTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '尚未完成自动同步';
   const connectorFetch = async (path, options = {}) => {
+    if (!IS_LOCAL_PAGE) throw new Error('本机数据连接器仅可从本机页面使用。');
     let response;
     try {
       response = await fetch(CONNECTOR + path, {
@@ -366,7 +368,7 @@ const SCHEMA='ktv-legacy-v1',langs=['中文','日文','英文'],es=()=>({lang:'�
     }
   };
   window.undoLatestImport = () => toast('撤销接口下一步再接');
-  setTimeout(checkConnector, 1200);
+  if (IS_LOCAL_PAGE) setTimeout(checkConnector, 1200);
 })();
 </script>
 <script>
@@ -485,4 +487,4 @@ const SCHEMA='ktv-legacy-v1',langs=['中文','日文','英文'],es=()=>({lang:'�
   };
   document.head.insertAdjacentHTML('beforeend', '<style>#webAccountBody input{width:100%;margin:14px 0 8px;padding:13px;border:1px solid #4a474d;border-radius:10px;background:#1b1b20;color:#fff;font:inherit}#webAccountBody small{color:#aaa6ab}</style>');
 })();
-</script></body></html>
+</script><script src="cloud-library.js"></script></body></html>

@@ -7,5 +7,5 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const sql = await fs.readFile(path.join(root, 'schema.sql'), 'utf8');
 const pool = await getPool();
 await pool.query(sql);
-console.log('Phase 1 database schema is ready.');
+console.log('Database schema is ready.');
 await pool.end();
