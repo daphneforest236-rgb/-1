@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { query } from './db.mjs';
 import { hashPassword, hashToken, newOpaqueToken, verifyPassword } from './passwords.mjs';
 import { getPlaylistDetail, getSongDetail, NeteaseMetadataError, searchSongs } from './netease-metadata.mjs';
-import { importPublicPlaylist, PlaylistImportError, previewPublicPlaylist } from './netease-playlist-import.mjs';
+import { importPublicPlaylist, importPublicPlaylists, PlaylistImportError, previewPublicPlaylist, previewPublicPlaylists } from './netease-playlist-import.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
@@ -270,6 +270,26 @@ async function handle(req, res) {
       try {
         const input = await body(req);
         const result = await importPublicPlaylist(user.id, input.playlist);
+        return reply(res, 200, result, origin);
+      } catch (error) {
+        return replyPlaylistImportError(res, error, origin);
+      }
+    }
+
+    if (req.method === 'POST' && req.url === '/api/netease/import/batch/preview') {
+      try {
+        const input = await body(req);
+        const preview = await previewPublicPlaylists({ query }, user.id, input.playlists);
+        return reply(res, 200, preview, origin);
+      } catch (error) {
+        return replyPlaylistImportError(res, error, origin);
+      }
+    }
+
+    if (req.method === 'POST' && req.url === '/api/netease/import/batch') {
+      try {
+        const input = await body(req);
+        const result = await importPublicPlaylists(user.id, input.playlists);
         return reply(res, 200, result, origin);
       } catch (error) {
         return replyPlaylistImportError(res, error, origin);

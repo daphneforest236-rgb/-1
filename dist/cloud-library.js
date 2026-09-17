@@ -1,6 +1,6 @@
 (() => {
   const cloudApiBase = window.KTV_WEB_API_URL || (location.protocol === 'file:' ? 'http://127.0.0.1:8787' : '');
-  const cloudState = { user: null, active: false, loading: false, localCandidates: [], neteasePreview: null, neteaseInput: '' };
+  const cloudState = { user: null, active: false, loading: false, localCandidates: [], neteasePlaylistInputs: [], neteaseBatchPreview: null };
   const initialLocalLibrary = Array.isArray(state.library) ? state.library.map(track => ({ ...track })) : [];
   cloudState.localCandidates = initialLocalLibrary.length ? initialLocalLibrary : (window.KTV_IMPORTED?.tracks || []).map(track => ({ ...track }));
 
@@ -123,14 +123,21 @@
     ? state.library.map(track => `<div class="list-item"><span><strong>${h(track.title)}</strong><br><small>${h(track.artist)} · ${h(track.lang)} · ${h(track.pref)}</small></span><button class="source-remove" onclick="deleteCloudTrack('${track.id}')">删除</button></div>`).join('')
     : '<div class="pending-empty">你的云端曲库目前没有歌曲。</div>';
   const renderNeteasePreview = () => {
-    const preview = cloudState.neteasePreview;
+    const preview = cloudState.neteaseBatchPreview;
     if (!preview) return '';
-    const examples = preview.tracks.slice(0, 5).map(track => `<li>${h(track.name)} · ${h(track.artists.map(artist => artist.name).join(' / '))}</li>`).join('');
+    const playlistRows = preview.playlists.map(playlist => {
+      if (playlist.error) return `<li><strong>${h(playlist.sourceId || '无效输入')}</strong> · 读取失败：${h(playlist.error.message)}</li>`;
+      return `<li><strong>${h(playlist.name)}</strong> · ${playlist.trackCount} 首（返回 ${playlist.returnedTrackCount} 首）· ${playlist.complete ? '完整' : '不完整'}</li>`;
+    }).join('');
     const confirm = preview.complete
-      ? '<button class="primary" onclick="confirmNeteasePlaylistImport()">确认导入到我的云端曲库</button>'
-      : '<div class="note">歌单资料不完整，不能导入。</div>';
-    return `<div class="sync-section">歌单预览</div><div class="note">${h(preview.playlist.name)} · 共 ${preview.total} 首<br>新增 ${preview.newCount} 首 · 已存在 ${preview.duplicateCount} 首 · ${preview.complete ? '歌单完整' : '歌单不完整'}</div><ul class="netease-preview-list">${examples}</ul>${confirm}`;
+      ? '<button class="primary" onclick="confirmNeteasePlaylistImport()">确认全部导入到我的云端曲库</button>'
+      : '<div class="note">存在读取失败或不完整歌单，请删除问题歌单后重新预览。</div>';
+    const duplicateInputs = preview.duplicatePlaylistInputCount ? `<br>重复输入已合并：${preview.duplicatePlaylistInputCount} 个` : '';
+    return `<div class="sync-section">批量歌单预览</div><div class="note">选择 ${preview.playlistCount} 个歌单<br>原始共 ${preview.rawTrackCount} 首 · 跨歌单重复 ${preview.crossPlaylistDuplicateCount} 首<br>去重后 ${preview.uniqueTrackCount} 首 · 云端已有 ${preview.existingCount} 首 · 本次预计新增 ${preview.newCount} 首${duplicateInputs}<br>${preview.complete ? '全部歌单完整，可确认导入。' : '存在问题歌单，已禁止导入。'}</div><ul class="netease-preview-list">${playlistRows}</ul>${confirm}`;
   };
+  const renderNeteasePlaylistInputs = () => cloudState.neteasePlaylistInputs.length
+    ? `<ul class="netease-preview-list">${cloudState.neteasePlaylistInputs.map((playlist, index) => `<li>${h(playlist)} <button class="source-remove" onclick="removeNeteasePlaylist(${index})">删除</button></li>`).join('')}</ul>`
+    : '<div class="note">尚未添加歌单；一次最多 10 个。</div>';
   function openCloudLibrary() {
     if (!cloudState.user) {
       sheet('<div class="handle"></div><h2>云端曲库</h2><div class="note">请先在“网站账号与云端测试”中登录网站账号。</div><button class="secondary" onclick="settings()">返回设置</button>');
@@ -139,7 +146,7 @@
     const importNote = cloudState.localCandidates.length
       ? `<button class="secondary" onclick="importLocalLibrary()">将本机候选歌曲导入当前账号（${cloudState.localCandidates.length} 首）</button>`
       : '';
-    sheet(`<div class="handle"></div><h2>云端曲库</h2><p>当前网站账号：${h(cloudState.user.displayName)}。这些歌曲来自 PostgreSQL，不会与其他账号混合。</p><div class="note" id="cloudLibraryPanelStatus">当前云端曲库：${state.library.length} 首。</div><div class="sync-section">导入公开网易云歌单</div><input id="neteasePlaylistInput" maxlength="500" value="${h(cloudState.neteaseInput)}" placeholder="输入网易云歌单 ID 或 music.163.com 链接"><button class="secondary" onclick="previewNeteasePlaylist()">预览歌单</button>${renderNeteasePreview()}${importNote}<input id="cloudTrackTitle" maxlength="200" placeholder="歌名"><input id="cloudTrackArtist" maxlength="200" placeholder="歌手"><input id="cloudTrackLang" maxlength="40" value="中文" placeholder="语言"><button class="primary" onclick="addCloudTrack()">添加到我的云端曲库</button><div class="sync-section">当前歌曲</div>${renderLibraryRows()}<button class="secondary" onclick="settings()">返回设置</button>`);
+    sheet(`<div class="handle"></div><h2>云端曲库</h2><p>当前网站账号：${h(cloudState.user.displayName)}。这些歌曲来自 PostgreSQL，不会与其他账号混合。</p><div class="note" id="cloudLibraryPanelStatus">当前云端曲库：${state.library.length} 首。</div><div class="sync-section">批量导入公开网易云歌单</div><input id="neteasePlaylistCandidate" maxlength="500" placeholder="输入网易云歌单 ID 或 music.163.com 链接"><button class="secondary" onclick="addNeteasePlaylist()">添加歌单</button>${renderNeteasePlaylistInputs()}<button class="secondary" onclick="previewNeteasePlaylists()">批量预览</button>${renderNeteasePreview()}${importNote}<input id="cloudTrackTitle" maxlength="200" placeholder="歌名"><input id="cloudTrackArtist" maxlength="200" placeholder="歌手"><input id="cloudTrackLang" maxlength="40" value="中文" placeholder="语言"><button class="primary" onclick="addCloudTrack()">添加到我的云端曲库</button><div class="sync-section">当前歌曲</div>${renderLibraryRows()}<button class="secondary" onclick="settings()">返回设置</button>`);
   }
   const panelStatus = text => { const element = document.querySelector('#cloudLibraryPanelStatus'); if (element) element.textContent = text; };
   window.addCloudTrack = async () => {
@@ -176,13 +183,25 @@
       toast(`已导入 ${result.added} 首；已跳过 ${result.skipped} 首重复歌曲`);
     } catch (error) { panelStatus(`导入失败：${error.message}`); toast(error.message); }
   };
-  window.previewNeteasePlaylist = async () => {
-    const input = document.querySelector('#neteasePlaylistInput')?.value.trim() || '';
-    cloudState.neteaseInput = input;
-    cloudState.neteasePreview = null;
+  window.addNeteasePlaylist = () => {
+    const input = document.querySelector('#neteasePlaylistCandidate')?.value.trim() || '';
+    if (!input) return toast('请输入网易云公开歌单 ID 或链接');
+    if (cloudState.neteasePlaylistInputs.length >= 10) return toast('一次最多添加 10 个歌单');
+    cloudState.neteasePlaylistInputs.push(input);
+    cloudState.neteaseBatchPreview = null;
+    openCloudLibrary();
+  };
+  window.removeNeteasePlaylist = index => {
+    cloudState.neteasePlaylistInputs.splice(index, 1);
+    cloudState.neteaseBatchPreview = null;
+    openCloudLibrary();
+  };
+  window.previewNeteasePlaylists = async () => {
+    if (!cloudState.neteasePlaylistInputs.length) return toast('请先添加至少一个公开歌单');
+    cloudState.neteaseBatchPreview = null;
     panelStatus('正在读取公开网易云歌单…');
     try {
-      cloudState.neteasePreview = await cloudRequest('/api/netease/import/preview', { method: 'POST', body: JSON.stringify({ playlist: input }) });
+      cloudState.neteaseBatchPreview = await cloudRequest('/api/netease/import/batch/preview', { method: 'POST', body: JSON.stringify({ playlists: cloudState.neteasePlaylistInputs }) });
       openCloudLibrary();
       panelStatus('歌单预览已生成。请核对数量后确认导入。');
     } catch (error) {
@@ -191,12 +210,13 @@
     }
   };
   window.confirmNeteasePlaylistImport = async () => {
-    if (!cloudState.neteasePreview || !cloudState.neteasePreview.complete) return;
-    if (!window.confirm(`确认将「${cloudState.neteasePreview.playlist.name}」的新歌曲导入当前网站账号？`)) return;
+    if (!cloudState.neteaseBatchPreview || !cloudState.neteaseBatchPreview.complete) return;
+    if (!window.confirm(`确认将 ${cloudState.neteaseBatchPreview.newCount} 首新歌曲导入当前网站账号？`)) return;
     panelStatus('正在导入公开网易云歌单…');
     try {
-      const result = await cloudRequest('/api/netease/import', { method: 'POST', body: JSON.stringify({ playlist: cloudState.neteaseInput }) });
-      cloudState.neteasePreview = null;
+      const result = await cloudRequest('/api/netease/import/batch', { method: 'POST', body: JSON.stringify({ playlists: cloudState.neteasePlaylistInputs }) });
+      cloudState.neteaseBatchPreview = null;
+      cloudState.neteasePlaylistInputs = [];
       await loadCloudLibrary();
       openCloudLibrary();
       toast(`已导入 ${result.imported} 首；已跳过 ${result.skipped} 首重复歌曲`);
