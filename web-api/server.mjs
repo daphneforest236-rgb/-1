@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { query } from './db.mjs';
 import { hashPassword, hashToken, newOpaqueToken, verifyPassword } from './passwords.mjs';
 import { getPlaylistDetail, getSongDetail, NeteaseMetadataError, searchSongs } from './netease-metadata.mjs';
+import { importPublicPlaylist, PlaylistImportError, previewPublicPlaylist } from './netease-playlist-import.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
@@ -57,6 +58,15 @@ function replyNeteaseMetadataError(res, error, origin) {
   // Keep upstream diagnostics server-side without printing request headers,
   // Cookies, tokens, or a third-party stack trace.
   console.error('[netease-metadata]', { code, causeCode: error?.cause?.code });
+  return reply(res, status, { error: message, code }, origin);
+}
+
+function replyPlaylistImportError(res, error, origin) {
+  const known = error instanceof PlaylistImportError;
+  const status = known ? error.status : 502;
+  const code = known ? error.code : 'PLAYLIST_IMPORT_UNEXPECTED_ERROR';
+  const message = known ? error.message : '网易云歌单导入暂时不可用。';
+  console.error('[netease-playlist-import]', { code, causeCode: error?.cause?.code });
   return reply(res, status, { error: message, code }, origin);
 }
 
@@ -245,6 +255,26 @@ async function handle(req, res) {
     const user = await currentUser(req);
     if (!user) return reply(res, 401, { error: '请先登录网站账号。' }, origin);
     if (req.method === 'GET' && req.url === '/me') return reply(res, 200, { user: { id: user.id, email: user.email, displayName: user.display_name } }, origin);
+
+    if (req.method === 'POST' && req.url === '/api/netease/import/preview') {
+      try {
+        const input = await body(req);
+        const preview = await previewPublicPlaylist({ query }, user.id, input.playlist);
+        return reply(res, 200, preview, origin);
+      } catch (error) {
+        return replyPlaylistImportError(res, error, origin);
+      }
+    }
+
+    if (req.method === 'POST' && req.url === '/api/netease/import') {
+      try {
+        const input = await body(req);
+        const result = await importPublicPlaylist(user.id, input.playlist);
+        return reply(res, 200, result, origin);
+      } catch (error) {
+        return replyPlaylistImportError(res, error, origin);
+      }
+    }
 
     if (req.method === 'GET' && req.url === '/phase1/items') {
       const result = await query('SELECT id, value, created_at FROM user_test_items WHERE user_id = $1 ORDER BY created_at DESC', [user.id]);

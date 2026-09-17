@@ -14,3 +14,18 @@ export async function getPool() {
 export async function query(text, params = []) {
   return (await getPool()).query(text, params);
 }
+
+export async function transaction(work) {
+  const client = await (await getPool()).connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}

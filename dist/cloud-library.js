@@ -1,6 +1,6 @@
 (() => {
   const cloudApiBase = window.KTV_WEB_API_URL || (location.protocol === 'file:' ? 'http://127.0.0.1:8787' : '');
-  const cloudState = { user: null, active: false, loading: false, localCandidates: [] };
+  const cloudState = { user: null, active: false, loading: false, localCandidates: [], neteasePreview: null, neteaseInput: '' };
   const initialLocalLibrary = Array.isArray(state.library) ? state.library.map(track => ({ ...track })) : [];
   cloudState.localCandidates = initialLocalLibrary.length ? initialLocalLibrary : (window.KTV_IMPORTED?.tracks || []).map(track => ({ ...track }));
 
@@ -122,6 +122,15 @@
   const renderLibraryRows = () => state.library.length
     ? state.library.map(track => `<div class="list-item"><span><strong>${h(track.title)}</strong><br><small>${h(track.artist)} · ${h(track.lang)} · ${h(track.pref)}</small></span><button class="source-remove" onclick="deleteCloudTrack('${track.id}')">删除</button></div>`).join('')
     : '<div class="pending-empty">你的云端曲库目前没有歌曲。</div>';
+  const renderNeteasePreview = () => {
+    const preview = cloudState.neteasePreview;
+    if (!preview) return '';
+    const examples = preview.tracks.slice(0, 5).map(track => `<li>${h(track.name)} · ${h(track.artists.map(artist => artist.name).join(' / '))}</li>`).join('');
+    const confirm = preview.complete
+      ? '<button class="primary" onclick="confirmNeteasePlaylistImport()">确认导入到我的云端曲库</button>'
+      : '<div class="note">歌单资料不完整，不能导入。</div>';
+    return `<div class="sync-section">歌单预览</div><div class="note">${h(preview.playlist.name)} · 共 ${preview.total} 首<br>新增 ${preview.newCount} 首 · 已存在 ${preview.duplicateCount} 首 · ${preview.complete ? '歌单完整' : '歌单不完整'}</div><ul class="netease-preview-list">${examples}</ul>${confirm}`;
+  };
   function openCloudLibrary() {
     if (!cloudState.user) {
       sheet('<div class="handle"></div><h2>云端曲库</h2><div class="note">请先在“网站账号与云端测试”中登录网站账号。</div><button class="secondary" onclick="settings()">返回设置</button>');
@@ -130,7 +139,7 @@
     const importNote = cloudState.localCandidates.length
       ? `<button class="secondary" onclick="importLocalLibrary()">将本机候选歌曲导入当前账号（${cloudState.localCandidates.length} 首）</button>`
       : '';
-    sheet(`<div class="handle"></div><h2>云端曲库</h2><p>当前网站账号：${h(cloudState.user.displayName)}。这些歌曲来自 PostgreSQL，不会与其他账号混合。</p><div class="note" id="cloudLibraryPanelStatus">当前云端曲库：${state.library.length} 首。</div>${importNote}<input id="cloudTrackTitle" maxlength="200" placeholder="歌名"><input id="cloudTrackArtist" maxlength="200" placeholder="歌手"><input id="cloudTrackLang" maxlength="40" value="中文" placeholder="语言"><button class="primary" onclick="addCloudTrack()">添加到我的云端曲库</button><div class="sync-section">当前歌曲</div>${renderLibraryRows()}<button class="secondary" onclick="settings()">返回设置</button>`);
+    sheet(`<div class="handle"></div><h2>云端曲库</h2><p>当前网站账号：${h(cloudState.user.displayName)}。这些歌曲来自 PostgreSQL，不会与其他账号混合。</p><div class="note" id="cloudLibraryPanelStatus">当前云端曲库：${state.library.length} 首。</div><div class="sync-section">导入公开网易云歌单</div><input id="neteasePlaylistInput" maxlength="500" value="${h(cloudState.neteaseInput)}" placeholder="输入网易云歌单 ID 或 music.163.com 链接"><button class="secondary" onclick="previewNeteasePlaylist()">预览歌单</button>${renderNeteasePreview()}${importNote}<input id="cloudTrackTitle" maxlength="200" placeholder="歌名"><input id="cloudTrackArtist" maxlength="200" placeholder="歌手"><input id="cloudTrackLang" maxlength="40" value="中文" placeholder="语言"><button class="primary" onclick="addCloudTrack()">添加到我的云端曲库</button><div class="sync-section">当前歌曲</div>${renderLibraryRows()}<button class="secondary" onclick="settings()">返回设置</button>`);
   }
   const panelStatus = text => { const element = document.querySelector('#cloudLibraryPanelStatus'); if (element) element.textContent = text; };
   window.addCloudTrack = async () => {
@@ -167,6 +176,35 @@
       toast(`已导入 ${result.added} 首；已跳过 ${result.skipped} 首重复歌曲`);
     } catch (error) { panelStatus(`导入失败：${error.message}`); toast(error.message); }
   };
+  window.previewNeteasePlaylist = async () => {
+    const input = document.querySelector('#neteasePlaylistInput')?.value.trim() || '';
+    cloudState.neteaseInput = input;
+    cloudState.neteasePreview = null;
+    panelStatus('正在读取公开网易云歌单…');
+    try {
+      cloudState.neteasePreview = await cloudRequest('/api/netease/import/preview', { method: 'POST', body: JSON.stringify({ playlist: input }) });
+      openCloudLibrary();
+      panelStatus('歌单预览已生成。请核对数量后确认导入。');
+    } catch (error) {
+      panelStatus(`歌单预览失败：${error.message}`);
+      toast(error.message);
+    }
+  };
+  window.confirmNeteasePlaylistImport = async () => {
+    if (!cloudState.neteasePreview || !cloudState.neteasePreview.complete) return;
+    if (!window.confirm(`确认将「${cloudState.neteasePreview.playlist.name}」的新歌曲导入当前网站账号？`)) return;
+    panelStatus('正在导入公开网易云歌单…');
+    try {
+      const result = await cloudRequest('/api/netease/import', { method: 'POST', body: JSON.stringify({ playlist: cloudState.neteaseInput }) });
+      cloudState.neteasePreview = null;
+      await loadCloudLibrary();
+      openCloudLibrary();
+      toast(`已导入 ${result.imported} 首；已跳过 ${result.skipped} 首重复歌曲`);
+    } catch (error) {
+      panelStatus(`歌单导入失败：${error.message}`);
+      toast(error.message);
+    }
+  };
 
   const basePref = window.pref;
   window.pref = async (id, pref) => {
@@ -201,6 +239,6 @@
     loadCloudLibrary();
   };
 
-  document.head.insertAdjacentHTML('beforeend', '<style>.cloud-library-status{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#2a292e;color:#b2aeb3;font-size:13px;line-height:1.55}.cloud-library-status.ready{color:#a8dfb7;border-left:3px solid #49b36d}.cloud-library-status.error{color:#ffb0b8;border-left:3px solid #ef4051}.cloud-library-status.local{color:#d7cba6;border-left:3px solid #c6a65c}#sheet input{width:100%;margin:0 0 9px;padding:13px;border:1px solid #4a474d;border-radius:10px;background:#1b1b20;color:#fff;font:inherit}#sheet small{color:#aaa6ab}</style>');
+  document.head.insertAdjacentHTML('beforeend', '<style>.cloud-library-status{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#2a292e;color:#b2aeb3;font-size:13px;line-height:1.55}.cloud-library-status.ready{color:#a8dfb7;border-left:3px solid #49b36d}.cloud-library-status.error{color:#ffb0b8;border-left:3px solid #ef4051}.cloud-library-status.local{color:#d7cba6;border-left:3px solid #c6a65c}#sheet input{width:100%;margin:0 0 9px;padding:13px;border:1px solid #4a474d;border-radius:10px;background:#1b1b20;color:#fff;font:inherit}#sheet small{color:#aaa6ab}.netease-preview-list{margin:8px 0 12px;padding-left:20px;color:#cfcbd0;font-size:13px;line-height:1.6}</style>');
   setTimeout(identifyCloudUser, 0);
 })();
