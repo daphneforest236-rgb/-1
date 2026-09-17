@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { query } from './db.mjs';
 import { hashPassword, hashToken, newOpaqueToken, verifyPassword } from './passwords.mjs';
+import { getPlaylistDetail, getSongDetail, NeteaseMetadataError, searchSongs } from './netease-metadata.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
@@ -46,6 +47,17 @@ function reply(res, status, payload, origin) {
   }
   res.writeHead(status, headers);
   res.end(JSON.stringify(payload));
+}
+
+function replyNeteaseMetadataError(res, error, origin) {
+  const known = error instanceof NeteaseMetadataError;
+  const status = known ? error.status : 502;
+  const code = known ? error.code : 'NETEASE_UNEXPECTED_ERROR';
+  const message = known ? error.message : '网易云元数据服务暂时不可用。';
+  // Keep upstream diagnostics server-side without printing request headers,
+  // Cookies, tokens, or a third-party stack trace.
+  console.error('[netease-metadata]', { code, causeCode: error?.cause?.code });
+  return reply(res, status, { error: message, code }, origin);
 }
 
 function setSessionCookie(res, token) {
@@ -168,6 +180,33 @@ async function handle(req, res) {
     if (req.method === 'GET' && req.url === '/health') {
       await query('SELECT 1');
       return reply(res, 200, { status: 'ok', service: 'ktv-web-api', database: 'connected' }, origin);
+    }
+
+    const requestUrl = new URL(req.url, 'http://local');
+    if (req.method === 'GET' && requestUrl.pathname === '/api/netease/search') {
+      try {
+        return reply(res, 200, await searchSongs(requestUrl.searchParams.get('q')), origin);
+      } catch (error) {
+        return replyNeteaseMetadataError(res, error, origin);
+      }
+    }
+
+    const songMetadataMatch = requestUrl.pathname.match(/^\/api\/netease\/songs\/([^/]+)$/);
+    if (req.method === 'GET' && songMetadataMatch) {
+      try {
+        return reply(res, 200, { song: await getSongDetail(songMetadataMatch[1]) }, origin);
+      } catch (error) {
+        return replyNeteaseMetadataError(res, error, origin);
+      }
+    }
+
+    const playlistMetadataMatch = requestUrl.pathname.match(/^\/api\/netease\/playlists\/([^/]+)$/);
+    if (req.method === 'GET' && playlistMetadataMatch) {
+      try {
+        return reply(res, 200, { playlist: await getPlaylistDetail(playlistMetadataMatch[1]) }, origin);
+      } catch (error) {
+        return replyNeteaseMetadataError(res, error, origin);
+      }
     }
 
     if (req.method === 'POST' && req.url === '/auth/register') {

@@ -8,6 +8,7 @@
     "migrate": "node --env-file-if-exists=.env migrate.mjs"
   },
   "dependencies": {
+    "@neteasecloudmusicapienhanced/api": "4.40.1",
     "pg": "^8.13.1"
   },
   "engines": {
