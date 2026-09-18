@@ -47,3 +47,34 @@ CREATE TABLE IF NOT EXISTS user_library_tracks (
   UNIQUE (user_id, source_song_id)
 );
 CREATE INDEX IF NOT EXISTS user_library_tracks_user_id_idx ON user_library_tracks(user_id, created_at DESC);
+
+-- Phase 3F-2: one encrypted NetEase connection per website user.  A missing
+-- row means disconnected; reconnect_required intentionally retains only safe
+-- metadata and never a credential.
+CREATE TABLE IF NOT EXISTS netease_connections (
+  user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE,
+  netease_uid TEXT NOT NULL,
+  netease_nickname TEXT NULL,
+  status TEXT NOT NULL CHECK (status IN ('connected', 'reconnect_required')),
+  credential_ciphertext TEXT NULL,
+  credential_iv TEXT NULL,
+  credential_auth_tag TEXT NULL,
+  credential_key_version INTEGER NULL,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_verified_at TIMESTAMPTZ NULL,
+  last_error_code TEXT NULL,
+  CHECK (
+    (status = 'connected'
+      AND credential_ciphertext IS NOT NULL
+      AND credential_iv IS NOT NULL
+      AND credential_auth_tag IS NOT NULL
+      AND credential_key_version IS NOT NULL)
+    OR
+    (status = 'reconnect_required'
+      AND credential_ciphertext IS NULL
+      AND credential_iv IS NULL
+      AND credential_auth_tag IS NULL
+      AND credential_key_version IS NULL)
+  )
+);

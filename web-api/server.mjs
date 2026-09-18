@@ -7,6 +7,10 @@ import { query } from './db.mjs';
 import { hashPassword, hashToken, newOpaqueToken, verifyPassword } from './passwords.mjs';
 import { getPlaylistDetail, getSongDetail, NeteaseMetadataError, searchSongs } from './netease-metadata.mjs';
 import { importPublicPlaylist, importPublicPlaylists, PlaylistImportError, previewPublicPlaylist, previewPublicPlaylists } from './netease-playlist-import.mjs';
+import { createQrLogin, checkQrLogin, getAuthenticatedAccount, NeteaseAccountError } from './netease-account.mjs';
+import { assertNeteaseCredentialEncryptionConfigured, decryptNeteaseCredential, encryptNeteaseCredential, NeteaseCredentialError } from './netease-credential.mjs';
+import { clearAllNeteaseLoginAttempts, clearNeteaseLoginAttempt, createNeteaseLoginAttempt, getNeteaseLoginAttempt, updateNeteaseLoginAttempt } from './netease-login-attempts.mjs';
+import { deleteNeteaseConnection, getNeteaseConnection, markNeteaseReconnectRequired, neteaseConnectionPayload, saveConnectedNeteaseConnection, touchVerifiedNeteaseConnection } from './netease-connections.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
@@ -67,6 +71,24 @@ function replyPlaylistImportError(res, error, origin) {
   const code = known ? error.code : 'PLAYLIST_IMPORT_UNEXPECTED_ERROR';
   const message = known ? error.message : '网易云歌单导入暂时不可用。';
   console.error('[netease-playlist-import]', { code, causeCode: error?.cause?.code });
+  return reply(res, status, { error: message, code }, origin);
+}
+
+function replyNeteaseAccountError(res, error, origin) {
+  const known = error instanceof NeteaseAccountError;
+  const status = known ? error.status : 502;
+  const code = known ? error.code : 'NETEASE_ACCOUNT_UNEXPECTED_ERROR';
+  const message = known ? error.message : '网易云账号服务暂时不可用。';
+  console.error('[netease-account]', { code, causeCode: error?.cause?.code });
+  return reply(res, status, { error: message, code }, origin);
+}
+
+function replyNeteaseCredentialError(res, error, origin) {
+  const known = error instanceof NeteaseCredentialError;
+  const code = known ? error.code : 'NETEASE_CREDENTIAL_UNEXPECTED_ERROR';
+  const status = code === 'NETEASE_CREDENTIAL_ENCRYPTION_UNAVAILABLE' ? 503 : 400;
+  const message = known ? error.message : '网易云连接凭据不可用。';
+  console.error('[netease-credential]', { code });
   return reply(res, status, { error: message, code }, origin);
 }
 
@@ -255,6 +277,105 @@ async function handle(req, res) {
     const user = await currentUser(req);
     if (!user) return reply(res, 401, { error: '请先登录网站账号。' }, origin);
     if (req.method === 'GET' && req.url === '/me') return reply(res, 200, { user: { id: user.id, email: user.email, displayName: user.display_name } }, origin);
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/netease/account/status') {
+      return reply(res, 200, neteaseConnectionPayload(await getNeteaseConnection(user.id)), origin);
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/netease/account/qr') {
+      try {
+        // Fail before issuing a QR that could never be persisted after a scan.
+        assertNeteaseCredentialEncryptionConfigured();
+        const qr = await createQrLogin();
+        const attempt = createNeteaseLoginAttempt(user.id, qr.qrKey);
+        return reply(res, 201, { attemptId: attempt.attemptId, qrImage: qr.qrImage, expiresAt: attempt.expiresAt }, origin);
+      } catch (error) {
+        if (error instanceof NeteaseCredentialError) return replyNeteaseCredentialError(res, error, origin);
+        return replyNeteaseAccountError(res, error, origin);
+      }
+    }
+
+    const qrAttemptMatch = requestUrl.pathname.match(/^\/api\/netease\/account\/qr\/([0-9a-f-]{36})$/i);
+    if (req.method === 'GET' && qrAttemptMatch) {
+      const attempt = getNeteaseLoginAttempt(user.id, qrAttemptMatch[1]);
+      // Treat another user's attempt exactly like a missing attempt.
+      if (!attempt) return reply(res, 404, { error: '二维码登录尝试不存在或已失效。' }, origin);
+      if (attempt.status === 'expired') return reply(res, 200, { status: 'expired' }, origin);
+      try {
+        const result = await checkQrLogin(attempt.qrKey);
+        if (result.status === 'waiting_scan' || result.status === 'waiting_confirm') {
+          updateNeteaseLoginAttempt(attempt, result.status);
+          return reply(res, 200, { status: result.status, expiresAt: new Date(attempt.expiresAt).toISOString() }, origin);
+        }
+        if (result.status === 'expired' || result.status === 'failed') {
+          clearNeteaseLoginAttempt(user.id, attempt.attemptId);
+          return reply(res, 200, { status: result.status }, origin);
+        }
+
+        let credential = result.credential;
+        try {
+          const encrypted = encryptNeteaseCredential(user.id, credential);
+          const connection = await saveConnectedNeteaseConnection(user.id, result.account, encrypted);
+          clearNeteaseLoginAttempt(user.id, attempt.attemptId);
+          return reply(res, 200, { status: 'connected', account: neteaseConnectionPayload(connection).account }, origin);
+        } finally {
+          credential = '';
+          result.credential = '';
+        }
+      } catch (error) {
+        if (error instanceof NeteaseCredentialError) {
+          clearNeteaseLoginAttempt(user.id, attempt.attemptId);
+          return replyNeteaseCredentialError(res, error, origin);
+        }
+        if (error instanceof NeteaseAccountError && error.kind === 'auth') {
+          clearNeteaseLoginAttempt(user.id, attempt.attemptId);
+          return reply(res, 200, { status: 'failed' }, origin);
+        }
+        return replyNeteaseAccountError(res, error, origin);
+      }
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/netease/account/verify') {
+      const connection = await getNeteaseConnection(user.id);
+      if (!connection) return reply(res, 200, { status: 'disconnected' }, origin);
+      if (connection.status === 'reconnect_required') return reply(res, 200, neteaseConnectionPayload(connection), origin);
+
+      let credential = '';
+      try {
+        credential = decryptNeteaseCredential(user.id, {
+          ciphertext: connection.credential_ciphertext,
+          iv: connection.credential_iv,
+          authTag: connection.credential_auth_tag,
+          keyVersion: connection.credential_key_version
+        });
+      } catch (error) {
+        if (error instanceof NeteaseCredentialError && error.code === 'NETEASE_CREDENTIAL_ENCRYPTION_UNAVAILABLE') {
+          return replyNeteaseCredentialError(res, error, origin);
+        }
+        const reconnect = await markNeteaseReconnectRequired(user.id, error?.code);
+        return reply(res, 200, neteaseConnectionPayload(reconnect), origin);
+      }
+
+      try {
+        const account = await getAuthenticatedAccount(credential);
+        const verified = await touchVerifiedNeteaseConnection(user.id, account);
+        return reply(res, 200, neteaseConnectionPayload(verified), origin);
+      } catch (error) {
+        if (error instanceof NeteaseAccountError && error.kind === 'auth') {
+          const reconnect = await markNeteaseReconnectRequired(user.id, error.code);
+          return reply(res, 200, neteaseConnectionPayload(reconnect), origin);
+        }
+        return replyNeteaseAccountError(res, error, origin);
+      } finally {
+        credential = '';
+      }
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/netease/account/disconnect') {
+      clearAllNeteaseLoginAttempts(user.id);
+      await deleteNeteaseConnection(user.id);
+      return reply(res, 200, { status: 'disconnected' }, origin);
+    }
 
     if (req.method === 'POST' && req.url === '/api/netease/import/preview') {
       try {
