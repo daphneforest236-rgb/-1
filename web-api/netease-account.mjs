@@ -30,6 +30,12 @@ function accountErrorFromWorker(error) {
   if (code === 'NETEASE_ACCOUNT_AUTH_INVALID') {
     return new NeteaseAccountError(code, '网易云账号连接已失效。', { status: 401, kind: 'auth' });
   }
+  if (code === 'NETEASE_ACCOUNT_TIMEOUT') {
+    return new NeteaseAccountError(code, '网易云账号服务请求超时。', { status: 504 });
+  }
+  if (code === 'NETEASE_PLAYLIST_RESPONSE_INVALID') {
+    return new NeteaseAccountError(code, '网易云歌单列表返回无效。');
+  }
   return new NeteaseAccountError(code, '网易云账号服务暂时不可用。');
 }
 
@@ -106,6 +112,26 @@ export async function getAuthenticatedAccount(credential) {
     });
   }
   return result.account;
+}
+
+export async function getUserPlaylists(uid, credential, limit, offset) {
+  const normalizedUid = String(uid || '').trim();
+  if (!normalizedUid || !String(credential || '')) {
+    throw new NeteaseAccountError('NETEASE_ACCOUNT_AUTH_INVALID', '网易云账号连接已失效。', {
+      status: 401,
+      kind: 'auth'
+    });
+  }
+  const result = await runAccountWorker('user_playlist', {
+    uid: normalizedUid,
+    credential: String(credential),
+    limit,
+    offset
+  });
+  if (!result || !Array.isArray(result.items) || !Object.hasOwn(result, 'total') || !Object.hasOwn(result, 'more')) {
+    throw new NeteaseAccountError('NETEASE_PLAYLIST_RESPONSE_INVALID', '网易云歌单列表返回无效。');
+  }
+  return result;
 }
 
 // Test-only task, never imported by server.mjs or exposed as an HTTP route.

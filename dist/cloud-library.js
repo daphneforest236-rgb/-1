@@ -1,6 +1,16 @@
 (() => {
   const cloudApiBase = window.KTV_WEB_API_URL || (location.protocol === 'file:' ? 'http://127.0.0.1:8787' : '');
-  const cloudState = { user: null, active: false, loading: false, localCandidates: [], neteasePlaylistInputs: [], neteaseBatchPreview: null };
+  const PLAYLIST_PAGE_LIMIT = 30;
+  const cloudState = {
+    user: null,
+    active: false,
+    loading: false,
+    localCandidates: [],
+    neteasePlaylistInputs: [],
+    neteaseBatchPreview: null,
+    neteaseAccount: { status: 'unknown', nickname: null, error: null },
+    myNeteasePlaylists: { items: [], offset: 0, more: null, loading: false, error: null }
+  };
   const initialLocalLibrary = Array.isArray(state.library) ? state.library.map(track => ({ ...track })) : [];
   cloudState.localCandidates = initialLocalLibrary.length ? initialLocalLibrary : (window.KTV_IMPORTED?.tracks || []).map(track => ({ ...track }));
 
@@ -111,13 +121,118 @@
   const phaseOneSettings = window.settings;
   window.settings = () => {
     phaseOneSettings();
+    const playlistEntry = document.createElement('button');
+    playlistEntry.className = 'row';
+    playlistEntry.innerHTML = '我的网易云歌单 <span>›</span>';
+    playlistEntry.onclick = openMyNeteasePlaylists;
     const entry = document.createElement('button');
     entry.className = 'row';
     entry.innerHTML = '云端曲库 <span>›</span>';
     entry.onclick = openCloudLibrary;
     const danger = document.querySelector('#sheet .danger');
+    document.querySelector('#sheet').insertBefore(playlistEntry, danger || null);
     document.querySelector('#sheet').insertBefore(entry, danger || null);
   };
+
+  const safePlaylist = item => {
+    const sourceId = String(item?.sourceId ?? '').trim();
+    const name = typeof item?.name === 'string' ? item.name.trim() : '';
+    const trackCount = Number(item?.trackCount);
+    if (!sourceId || !name || !Number.isSafeInteger(trackCount) || trackCount < 0) return null;
+    const coverUrl = typeof item?.coverUrl === 'string' && item.coverUrl.trim() ? item.coverUrl.trim() : null;
+    return { sourceId, name, trackCount, coverUrl };
+  };
+
+  const renderMyNeteasePlaylistCards = () => {
+    const playlistState = cloudState.myNeteasePlaylists;
+    if (playlistState.loading && !playlistState.items.length) return '<div class="note">正在读取我的网易云歌单…</div>';
+    if (playlistState.error) return `<div class="note netease-account-error">${h(playlistState.error)}</div><button class="secondary" onclick="retryMyNeteasePlaylists()">重试</button>`;
+    if (!playlistState.items.length) return '<div class="pending-empty">暂无歌单。</div>';
+    const cards = playlistState.items.map(playlist => {
+      const cover = playlist.coverUrl
+        ? `<img src="${h(playlist.coverUrl)}" alt="" loading="lazy">`
+        : '<span>歌单</span>';
+      return `<article class="netease-playlist-card" data-source-id="${h(playlist.sourceId)}"><div class="netease-playlist-cover">${cover}</div><div><strong>${h(playlist.name)}</strong><small>${playlist.trackCount} 首</small></div></article>`;
+    }).join('');
+    const loadMore = playlistState.loading
+      ? '<div class="note">正在加载更多歌单…</div>'
+      : playlistState.more === true
+        ? '<button class="secondary" onclick="loadMoreMyNeteasePlaylists()">加载更多</button>'
+        : '';
+    return `<div class="netease-playlist-list">${cards}</div>${loadMore}`;
+  };
+
+  const renderMyNeteasePlaylists = () => {
+    const account = cloudState.neteaseAccount;
+    let body = '';
+    if (account.status === 'unknown') body = '<div class="note">正在读取网易云连接状态…</div>';
+    else if (account.status === 'unauthenticated') body = '<div class="note">请先登录网站账号，然后再查看网易云歌单。</div>';
+    else if (account.status === 'disconnected') body = '<div class="note">需要先连接网易云账号。</div>';
+    else if (account.status === 'reconnect_required') body = '<div class="note">网易云账号需要重新连接。</div>';
+    else if (account.status === 'error') body = `<div class="note netease-account-error">${h(account.error || '网易云连接状态暂时不可用。')}</div><button class="secondary" onclick="retryMyNeteasePlaylists()">重试</button>`;
+    else if (account.status === 'connected') {
+      const nickname = account.nickname ? ` · ${h(account.nickname)}` : '';
+      body = `<div class="note netease-account-ready">已连接网易云${nickname}</div><div class="sync-section">我的网易云歌单</div>${renderMyNeteasePlaylistCards()}`;
+    }
+    sheet(`<div class="handle"></div><h2>我的网易云歌单</h2>${body}<button class="secondary" onclick="settings()">返回设置</button>`);
+  };
+
+  async function readMyNeteaseConnection() {
+    const result = await cloudRequest('/api/netease/account/status');
+    const status = ['disconnected', 'connected', 'reconnect_required'].includes(result?.status) ? result.status : 'error';
+    cloudState.neteaseAccount = {
+      status,
+      nickname: status === 'connected' && typeof result?.account?.nickname === 'string' ? result.account.nickname : null,
+      error: status === 'error' ? '网易云连接状态暂时不可用。' : null
+    };
+    return status;
+  }
+
+  async function requestMyNeteasePlaylists({ append = false } = {}) {
+    const playlistState = cloudState.myNeteasePlaylists;
+    if (playlistState.loading) return;
+    const offset = append ? playlistState.offset : 0;
+    playlistState.loading = true;
+    playlistState.error = null;
+    renderMyNeteasePlaylists();
+    try {
+      const result = await cloudRequest(`/api/netease/account/playlists?limit=${PLAYLIST_PAGE_LIMIT}&offset=${offset}`);
+      const existingIds = append ? new Set(playlistState.items.map(item => item.sourceId)) : new Set();
+      const incoming = Array.isArray(result?.items) ? result.items.map(safePlaylist).filter(Boolean).filter(item => {
+        if (existingIds.has(item.sourceId)) return false;
+        existingIds.add(item.sourceId);
+        return true;
+      }) : [];
+      playlistState.items = append ? [...playlistState.items, ...incoming] : incoming;
+      playlistState.offset = offset + PLAYLIST_PAGE_LIMIT;
+      playlistState.more = typeof result?.more === 'boolean' ? result.more : null;
+    } catch (error) {
+      if (error.message === '请先登录网站账号。') cloudState.neteaseAccount = { status: 'unauthenticated', nickname: null, error: null };
+      else playlistState.error = '网易云歌单暂时无法读取，请稍后重试。';
+    } finally {
+      playlistState.loading = false;
+      renderMyNeteasePlaylists();
+    }
+  }
+
+  async function openMyNeteasePlaylists() {
+    cloudState.myNeteasePlaylists = { items: [], offset: 0, more: null, loading: false, error: null };
+    cloudState.neteaseAccount = { status: 'unknown', nickname: null, error: null };
+    renderMyNeteasePlaylists();
+    try {
+      const status = await readMyNeteaseConnection();
+      renderMyNeteasePlaylists();
+      if (status === 'connected') await requestMyNeteasePlaylists();
+    } catch (error) {
+      cloudState.neteaseAccount = error.message === '请先登录网站账号。'
+        ? { status: 'unauthenticated', nickname: null, error: null }
+        : { status: 'error', nickname: null, error: '网易云连接状态暂时不可用。' };
+      renderMyNeteasePlaylists();
+    }
+  }
+
+  window.loadMoreMyNeteasePlaylists = () => requestMyNeteasePlaylists({ append: true });
+  window.retryMyNeteasePlaylists = () => openMyNeteasePlaylists();
 
   const renderLibraryRows = () => state.library.length
     ? state.library.map(track => `<div class="list-item"><span><strong>${h(track.title)}</strong><br><small>${h(track.artist)} · ${h(track.lang)} · ${h(track.pref)}</small></span><button class="source-remove" onclick="deleteCloudTrack('${track.id}')">删除</button></div>`).join('')
@@ -259,6 +374,6 @@
     loadCloudLibrary();
   };
 
-  document.head.insertAdjacentHTML('beforeend', '<style>.cloud-library-status{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#2a292e;color:#b2aeb3;font-size:13px;line-height:1.55}.cloud-library-status.ready{color:#a8dfb7;border-left:3px solid #49b36d}.cloud-library-status.error{color:#ffb0b8;border-left:3px solid #ef4051}.cloud-library-status.local{color:#d7cba6;border-left:3px solid #c6a65c}#sheet input{width:100%;margin:0 0 9px;padding:13px;border:1px solid #4a474d;border-radius:10px;background:#1b1b20;color:#fff;font:inherit}#sheet small{color:#aaa6ab}.netease-preview-list{margin:8px 0 12px;padding-left:20px;color:#cfcbd0;font-size:13px;line-height:1.6}</style>');
+  document.head.insertAdjacentHTML('beforeend', '<style>.cloud-library-status{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#2a292e;color:#b2aeb3;font-size:13px;line-height:1.55}.cloud-library-status.ready,.netease-account-ready{color:#a8dfb7;border-left:3px solid #49b36d}.cloud-library-status.error,.netease-account-error{color:#ffb0b8;border-left:3px solid #ef4051}.cloud-library-status.local{color:#d7cba6;border-left:3px solid #c6a65c}#sheet input{width:100%;margin:0 0 9px;padding:13px;border:1px solid #4a474d;border-radius:10px;background:#1b1b20;color:#fff;font:inherit}#sheet small{color:#aaa6ab}.netease-preview-list{margin:8px 0 12px;padding-left:20px;color:#cfcbd0;font-size:13px;line-height:1.6}.netease-playlist-list{margin:8px 0 12px}.netease-playlist-card{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center;padding:11px 0;border-top:1px solid #302f34}.netease-playlist-cover{width:52px;height:52px;border-radius:9px;overflow:hidden;display:grid;place-items:center;background:linear-gradient(140deg,#3a2944,#263b55);color:#d7cba6;font-size:11px;font-weight:800}.netease-playlist-cover img{width:100%;height:100%;object-fit:cover}.netease-playlist-card strong{display:block;line-height:1.4;word-break:break-word}.netease-playlist-card small{display:block;margin-top:4px}</style>');
   setTimeout(identifyCloudUser, 0);
 })();

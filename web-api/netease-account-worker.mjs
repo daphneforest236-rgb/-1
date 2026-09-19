@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { parentPort, workerData } from 'node:worker_threads';
+import { normalizeNeteaseUserPlaylistResponse } from './netease-playlist-dto.mjs';
 
 // This is intentionally a worker-local boundary. The main HTTP process never
 // patches global console methods. It runs before loading the third-party API.
@@ -61,6 +62,30 @@ async function accountForCredential(credential) {
   return { account: readAccountIdentity(response) };
 }
 
+function upstreamFailureCode(error) {
+  if (error?.code === 'NETEASE_PLAYLIST_RESPONSE_INVALID') return error.code;
+  if (Number(error?.status) === 401) return 'NETEASE_ACCOUNT_AUTH_INVALID';
+  if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT') return 'NETEASE_ACCOUNT_TIMEOUT';
+  return 'NETEASE_ACCOUNT_UPSTREAM_UNAVAILABLE';
+}
+
+async function userPlaylist(uid, credential, limit, offset) {
+  try {
+    const response = await neteaseApi.user_playlist({
+      ...requestOptions(String(credential || '')),
+      uid: String(uid || ''),
+      limit,
+      offset
+    });
+    if (response?.status !== 200) throw new Error('upstream');
+    return normalizeNeteaseUserPlaylistResponse(response?.body, { limit, offset });
+  } catch (error) {
+    const safeError = new Error('user_playlist failed');
+    safeError.code = upstreamFailureCode(error);
+    throw safeError;
+  }
+}
+
 async function main() {
   const { task, payload, testMode } = workerData || {};
   if (task === 'test_log_sentinel' && testMode === true) {
@@ -71,6 +96,7 @@ async function main() {
   if (task === 'create_qr') return createQr();
   if (task === 'check_qr') return checkQr(payload?.qrKey);
   if (task === 'user_account') return accountForCredential(payload?.credential);
+  if (task === 'user_playlist') return userPlaylist(payload?.uid, payload?.credential, payload?.limit, payload?.offset);
   throw new Error('unsupported_task');
 }
 

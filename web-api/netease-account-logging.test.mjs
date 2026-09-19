@@ -10,6 +10,7 @@ test('worker-only sanitization never patches main-process console or exposes a f
   assert.equal(console.error, originalError);
   await Promise.all(tasks.map(task =>
     assert.rejects(task, error => {
+      assert.equal(error.code, 'NETEASE_ACCOUNT_UPSTREAM_UNAVAILABLE');
       assert.equal(String(error.message).includes('FAKE_SECRET_COOKIE_SENTINEL'), false);
       assert.equal(String(error.code).includes('FAKE_SECRET_COOKIE_SENTINEL'), false);
       return true;

@@ -11,6 +11,8 @@ import { createQrLogin, checkQrLogin, getAuthenticatedAccount, NeteaseAccountErr
 import { assertNeteaseCredentialEncryptionConfigured, decryptNeteaseCredential, encryptNeteaseCredential, NeteaseCredentialError } from './netease-credential.mjs';
 import { clearAllNeteaseLoginAttempts, clearNeteaseLoginAttempt, createNeteaseLoginAttempt, getNeteaseLoginAttempt, updateNeteaseLoginAttempt } from './netease-login-attempts.mjs';
 import { deleteNeteaseConnection, getNeteaseConnection, markNeteaseReconnectRequired, neteaseConnectionPayload, saveConnectedNeteaseConnection, touchVerifiedNeteaseConnection } from './netease-connections.mjs';
+import { listCurrentUserNeteasePlaylists } from './netease-account-playlists.mjs';
+import { NeteaseUserPlaylistError, parsePlaylistPagination } from './netease-playlist-dto.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
@@ -89,6 +91,15 @@ function replyNeteaseCredentialError(res, error, origin) {
   const status = code === 'NETEASE_CREDENTIAL_ENCRYPTION_UNAVAILABLE' ? 503 : 400;
   const message = known ? error.message : '网易云连接凭据不可用。';
   console.error('[netease-credential]', { code });
+  return reply(res, status, { error: message, code }, origin);
+}
+
+function replyNeteaseUserPlaylistError(res, error, origin) {
+  const known = error instanceof NeteaseUserPlaylistError;
+  const status = known ? error.status : 502;
+  const code = known ? error.code : 'NETEASE_ACCOUNT_UPSTREAM_UNAVAILABLE';
+  const message = known ? error.message : '网易云歌单列表暂时不可用。';
+  console.error('[netease-user-playlists]', { code, causeCode: error?.cause?.code });
   return reply(res, status, { error: message, code }, origin);
 }
 
@@ -280,6 +291,16 @@ async function handle(req, res) {
 
     if (req.method === 'GET' && requestUrl.pathname === '/api/netease/account/status') {
       return reply(res, 200, neteaseConnectionPayload(await getNeteaseConnection(user.id)), origin);
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/netease/account/playlists') {
+      try {
+        const pagination = parsePlaylistPagination(requestUrl.searchParams);
+        return reply(res, 200, await listCurrentUserNeteasePlaylists(user.id, pagination), origin);
+      } catch (error) {
+        if (error instanceof NeteaseCredentialError) return replyNeteaseCredentialError(res, error, origin);
+        return replyNeteaseUserPlaylistError(res, error, origin);
+      }
     }
 
     if (req.method === 'POST' && requestUrl.pathname === '/api/netease/account/qr') {

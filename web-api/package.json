@@ -6,7 +6,7 @@
     "dev": "node --env-file-if-exists=.env --watch server.mjs",
     "start": "node --env-file-if-exists=.env server.mjs",
     "migrate": "node --env-file-if-exists=.env migrate.mjs",
-    "test:netease-account": "node --test netease-credential.test.mjs netease-login-attempts.test.mjs netease-account-logging.test.mjs"
+    "test:netease-account": "node --test netease-credential.test.mjs netease-login-attempts.test.mjs netease-account-logging.test.mjs netease-account-playlists.test.mjs"
   },
   "dependencies": {
     "@neteasecloudmusicapienhanced/api": "4.40.1",
